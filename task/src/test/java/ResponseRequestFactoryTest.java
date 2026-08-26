@@ -1,4 +1,5 @@
 import com.pickagent.w1d2.ResponseRequestFactory;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -8,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  * @author jamieLu
  * @create 2026-08-25
  */
+@Tag("integration")
 public class ResponseRequestFactoryTest {
     @Test
     public void normal() {

@@ -5,6 +5,7 @@ import com.pickagent.w1d2.ResponseTextExractor;
 import com.pickagent.w1d2.UnknownItem;
 import com.pickagent.w1d2.Usage;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -14,6 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * @author jamieLu
  * @create 2026-08-24
  */
+@Tag("integration")
 public class ResponseTextExractorTest {
     private static ResponseEnvelope responseEnvelope;
 

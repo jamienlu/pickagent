@@ -1,7 +1,6 @@
 import com.pickagent.w1d1.TokenBudget;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.function.Executable;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -12,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * @author jamieLu
  * @create 2026-08-24
  */
-
+@Tag("integration")
 public class TokenBudgetTest {
 
     @Test
