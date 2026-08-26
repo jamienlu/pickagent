@@ -21,7 +21,7 @@ class StreamTextAccumulatorTest {
         accumulator.accept(delta(", "));
         accumulator.accept(delta("world"));
 
-        assertEquals("Hello, world", accumulator.getClass());
+        assertEquals("Hello, world", accumulator.getText().toString());
     }
 
     @Test
@@ -32,7 +32,7 @@ class StreamTextAccumulatorTest {
         accumulator.accept(delta("OpenAI"));
         accumulator.accept(delta("！"));
 
-        assertEquals("你好，OpenAI！", accumulator.getText());
+        assertEquals("你好，OpenAI！", accumulator.getText().toString());
     }
 
     @Test
@@ -42,7 +42,7 @@ class StreamTextAccumulatorTest {
         accumulator.accept(delta("Hello"));
         accumulator.accept(done("Hello"));
 
-        assertEquals("Hello", accumulator.getText());
+        assertEquals("Hello", accumulator.getText().toString());
         assertTrue(accumulator.isOutputTextDone());
     }
 
@@ -60,7 +60,7 @@ class StreamTextAccumulatorTest {
 
         assertDoesNotThrow(() -> accumulator.accept(error));
         assertDoesNotThrow(() -> accumulator.accept(null));
-        assertEquals("", accumulator.getText());
+        assertEquals("", accumulator.getText().toString());
     }
 
     private static ResponseStreamEvent delta(String value) {
