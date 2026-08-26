@@ -9,7 +9,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  * @author jamieLu
  * @create 2026-08-25
  */
-@Tag("integration")
 public class ResponseRequestFactoryTest {
     @Test
     public void normal() {

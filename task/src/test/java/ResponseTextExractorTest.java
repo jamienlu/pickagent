@@ -15,7 +15,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * @author jamieLu
  * @create 2026-08-24
  */
-@Tag("integration")
 public class ResponseTextExractorTest {
     private static ResponseEnvelope responseEnvelope;
 

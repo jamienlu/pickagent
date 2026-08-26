@@ -11,7 +11,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * @author jamieLu
  * @create 2026-08-24
  */
-@Tag("integration")
 public class TokenBudgetTest {
 
     @Test
