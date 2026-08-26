@@ -13,6 +13,7 @@ import com.openai.models.responses.ResponseInputItem;
 import com.openai.models.responses.ResponseTextConfig;
 import com.openai.models.responses.ResponseUsage;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -26,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * @author jamieLu
  * @create 2026-08-25
  */
+@Tag("integration")
 public class ResponseCreateParamsTest {
    private static OpenAIClient client;
 
