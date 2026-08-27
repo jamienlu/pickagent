@@ -1,7 +1,8 @@
+package com.pickagent.w1d2;
+
 import com.alibaba.fastjson2.JSONObject;
 import com.openai.client.OpenAIClient;
 import com.openai.client.okhttp.OpenAIOkHttpClient;
-import com.openai.core.JsonObject;
 import com.openai.core.JsonValue;
 import com.openai.models.Reasoning;
 import com.openai.models.ReasoningEffort;

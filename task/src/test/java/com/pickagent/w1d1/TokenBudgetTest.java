@@ -1,5 +1,5 @@
-import com.pickagent.w1d1.TokenBudget;
-import org.junit.jupiter.api.Tag;
+package com.pickagent.w1d1;
+
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;

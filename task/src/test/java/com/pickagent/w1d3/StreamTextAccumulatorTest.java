@@ -1,9 +1,9 @@
+package com.pickagent.w1d3;
+
 import com.openai.models.responses.ResponseErrorEvent;
 import com.openai.models.responses.ResponseStreamEvent;
 import com.openai.models.responses.ResponseTextDeltaEvent;
 import com.openai.models.responses.ResponseTextDoneEvent;
-import com.pickagent.w1d3.StreamTextAccumulator;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

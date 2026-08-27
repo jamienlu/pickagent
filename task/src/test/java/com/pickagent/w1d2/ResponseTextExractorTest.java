@@ -1,11 +1,6 @@
+package com.pickagent.w1d2;
 
-import com.pickagent.w1d2.OutputText;
-import com.pickagent.w1d2.ResponseEnvelope;
-import com.pickagent.w1d2.ResponseTextExractor;
-import com.pickagent.w1d2.UnknownItem;
-import com.pickagent.w1d2.Usage;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
