@@ -8,6 +8,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GenerateEventUseCaseTest {
@@ -98,6 +99,27 @@ class GenerateEventUseCaseTest {
         assertEquals("connection timed out", failed.reason());
         assertEquals(0, parserCalls.get());
         assertEquals(1, gateway.callCount());
+    }
+
+    @Test
+    void unexpectedGatewayProgrammingErrorIsNotDisguisedAsTransportFailure() {
+        ModelGateway brokenGateway = command -> {
+            throw new IllegalStateException("adapter mapping bug");
+        };
+        AtomicInteger parserCalls = new AtomicInteger();
+        EventParser parser = content -> {
+            parserCalls.incrementAndGet();
+            return new EventParser.ParseResult.Invalid("must not be called");
+        };
+        GenerateEventUseCase useCase = new GenerateEventUseCase(brokenGateway, parser);
+
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class,
+                () -> useCase.generate("Extract this event.")
+        );
+
+        assertEquals("adapter mapping bug", exception.getMessage());
+        assertEquals(0, parserCalls.get());
     }
 
     @Test

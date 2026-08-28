@@ -17,18 +17,10 @@ public final class GenerateEventUseCase {
     public GenerateEventResult generate(String eventDescription) {
         ModelCommand command = new ModelCommand(PROMPT_PREFIX + requireDescription(eventDescription));
 
-        ModelResult modelResult;
-        try {
-            modelResult = Objects.requireNonNull(
-                    modelGateway.generate(command),
-                    "modelGateway returned null"
-            );
-        } catch (RuntimeException exception) {
-            return new GenerateEventResult.Failed(
-                    GenerateEventResult.FailureKind.GATEWAY_TRANSPORT,
-                    "Model gateway invocation failed: " + safeMessage(exception)
-            );
-        }
+        ModelResult modelResult = Objects.requireNonNull(
+                modelGateway.generate(command),
+                "modelGateway returned null"
+        );
 
         if (modelResult instanceof ModelResult.Refused refused) {
             return new GenerateEventResult.Refused(refused.reason());
@@ -69,10 +61,5 @@ public final class GenerateEventUseCase {
             case PROVIDER -> GenerateEventResult.FailureKind.GATEWAY_PROVIDER;
             case PROTOCOL -> GenerateEventResult.FailureKind.GATEWAY_PROTOCOL;
         };
-    }
-
-    private static String safeMessage(RuntimeException exception) {
-        String message = exception.getMessage();
-        return message == null || message.isBlank() ? exception.getClass().getSimpleName() : message;
     }
 }
