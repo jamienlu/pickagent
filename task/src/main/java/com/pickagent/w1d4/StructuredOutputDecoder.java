@@ -10,9 +10,28 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * 对模型返回的 Event JSON 执行防御式解析和精确字段校验。
+ *
+ * <p>该解码器不依赖 JSON 库的宽松映射默认值，而是显式检查顶层类型、字段集合、字段类型和数组元素。</p>
+ *
+ * @author jamieLu
+ * @since 2026-08-27
+ */
 public final class StructuredOutputDecoder {
+    /** Event 契约允许且必须出现的字段集合。 */
     private static final Set<String> EXPECTED_FIELDS = Set.of("name", "date", "participants");
 
+    /** 创建 Event 结构化输出解码器。 */
+    public StructuredOutputDecoder() {
+    }
+
+    /**
+     * 将模型文本解码为 Event 或稳定的失败结果。
+     *
+     * @param text 模型输出文本
+     * @return 成功事件或带错误分类的失败结果
+     */
     public DecodeResult decode(String text) {
         if (text == null || text.isBlank()) {
             return failure(DecodeResult.ErrorCode.EMPTY_TEXT, "Response text is null, empty, or blank");
@@ -78,15 +97,36 @@ public final class StructuredOutputDecoder {
         }
     }
 
+    /**
+     * 创建字段类型错误结果。
+     *
+     * @param field 字段路径
+     * @param expectedType 期望的 JSON 类型
+     * @param actualValue 实际值
+     * @return 字段类型错误
+     */
     private static DecodeResult.Failure wrongType(String field, String expectedType, Object actualValue) {
         return failure(DecodeResult.ErrorCode.WRONG_FIELD_TYPE,
                 "Field '" + field + "' must be " + expectedType + " but was " + jsonType(actualValue));
     }
 
+    /**
+     * 创建统一的解码失败结果。
+     *
+     * @param code 错误分类
+     * @param reason 失败原因
+     * @return 解码失败结果
+     */
     private static DecodeResult.Failure failure(DecodeResult.ErrorCode code, String reason) {
         return new DecodeResult.Failure(code, reason);
     }
 
+    /**
+     * 获取适合错误信息展示的 JSON 类型名称。
+     *
+     * @param value JSON 解析值
+     * @return 稳定的类型名称
+     */
     private static String jsonType(Object value) {
         if (value == null) {
             return "null";

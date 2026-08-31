@@ -4,11 +4,26 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
+ * 演示如何遍历异构输出并收集文本的 W1D2 学习辅助类。
+ *
+ * <p>类名与 DTO 结构保留当日练习状态，不作为生产提取器。</p>
+ *
  * @author jamieLu
- * @create 2026-08-24
+ * @since 2026-08-24
  */
 public class ResponseTextExractor {
+    /** 创建 W1D2 文本提取学习辅助类。 */
+    public ResponseTextExractor() {
+    }
 
+    /**
+     * 构造包含未知项和消息项的固定学习样例。
+     *
+     * @param item 未知输出项
+     * @param msg1 第一段文本
+     * @param msg2 第二段文本
+     * @return 用于离线测试的响应包络
+     */
     public ResponseEnvelope sample(UnknownItem item,OutputText msg1,OutputText msg2) {
         ResponseEnvelope responseEnvelope = new ResponseEnvelope();
         OutputItem outputItem1 = new OutputItem();
@@ -35,6 +50,12 @@ public class ResponseTextExractor {
         return responseEnvelope;
     }
 
+    /**
+     * 遍历响应中的 message 项并按顺序收集文本。
+     *
+     * @param responseEnvelope 学习型响应包络
+     * @return 按输出顺序排列的文本列表
+     */
     public List<String> mergeOutPutText(ResponseEnvelope responseEnvelope) {
         List<String> mergedText = new ArrayList<String>();
         for (int i = 0; i < responseEnvelope.getOutputItems().length; i++) {

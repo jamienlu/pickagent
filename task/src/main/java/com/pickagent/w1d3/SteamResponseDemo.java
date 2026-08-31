@@ -12,20 +12,29 @@ import java.time.Instant;
 import java.util.Iterator;
 
 /**
+ * 使用 OpenAI Java SDK 调用 DeepSeek 兼容端点的流式响应观察程序。
+ *
+ * <p>该程序记录事件类型、首段文本延迟和终态；运行会产生真实网络请求，凭据仅从
+ * {@code DEEPSEEK_KEY} 环境变量读取。</p>
+ *
  * @author jamieLu
- * @create 2026-08-26
+ * @since 2026-08-26
  */
 public class SteamResponseDemo {
+    /** 禁止实例化真实网络流式示例。 */
+    private SteamResponseDemo() {
+    }
+
+    /**
+     * 发起流式请求并输出文本增量、事件序列及延迟指标。
+     *
+     * @param args 命令行参数，本示例不使用
+     */
     public static void main(String[] args) {
         OpenAIClient client = OpenAIOkHttpClient.builder().apiKey(System.getenv("DEEPSEEK_KEY")).baseUrl("https://api.deepseek.com").build();
         ResponseCreateParams params = ResponseRequestFactory.builder()
                 .input("1+1=?").model("deepseek-v4-flash").maxOutputTokens(100).build()
                 .builderResponseParams();
-        // 无key情况：Exception in thread "main" java.lang.IllegalStateException: At least one credential source must be specified: credential (apiKey), workloadIdentity, or adminApiKey
-        //	at com.openai.core.ClientOptions$Builder.effectiveCredential(ClientOptions.kt:559)
-        //	at com.openai.core.ClientOptions$Builder.build(ClientOptions.kt:697)
-        //	at com.openai.client.okhttp.OpenAIOkHttpClient$Builder.build(OpenAIOkHttpClient.kt:476)
-        //	at com.pickagent.w1d3.SteamResponseDemo.main(SteamResponseDemo.java:20)
         Instant startedAt = Instant.now();
         long startedAtNanos = System.nanoTime();
         Long firstDeltaLatencyMillis = null;
@@ -104,10 +113,22 @@ public class SteamResponseDemo {
         }
     }
 
+    /**
+     * 计算从指定单调时钟起点到当前时刻的毫秒数。
+     *
+     * @param startedAtNanos {@link System#nanoTime()} 产生的起始值
+     * @return 已经过的毫秒数
+     */
     private static long elapsedMillis(long startedAtNanos) {
         return Duration.ofNanos(System.nanoTime() - startedAtNanos).toMillis();
     }
 
+    /**
+     * 将 SDK 流事件归一化为便于日志观察的事件名称。
+     *
+     * @param event SDK 流事件
+     * @return 已识别的事件名称，未知类型返回 {@code unhandled_event}
+     */
     private static String eventType(ResponseStreamEvent event) {
         if (event.isCreated()) return "response.created";
         if (event.isInProgress()) return "response.in_progress";
