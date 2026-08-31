@@ -4,9 +4,11 @@ import com.pickagent.w2d1.infrastructure.ReplayAgentModel;
 import com.pickagent.w2d1.infrastructure.ReplayOrderTool;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -39,6 +41,9 @@ class AgentRuntimeTest {
         assertEquals(Map.of("orderId", "ORD-001"), exchange.call().arguments());
         assertEquals("Order ORD-001: SHIPPED", exchange.result().output());
         assertEquals(completed.history(), secondRequest.history());
+        assertEquals(2, completed.stepsTaken());
+        assertEquals(new AgentStep(1, exchange.call(), Optional.of(exchange.result())), completed.steps().get(0));
+        assertEquals(new AgentStep(2, completed.answer(), Optional.empty()), completed.steps().get(1));
         assertEquals(completed, runtime.run("Find ORD-001"), "Replay is repeatable across runs");
     }
 
@@ -58,6 +63,8 @@ class AgentRuntimeTest {
                 result.trace());
         assertEquals(0, toolCalls.get());
         assertTrue(result.history().isEmpty());
+        assertEquals(1, result.stepsTaken());
+        assertEquals(new AgentDecision.FinalAnswer("Already known"), result.steps().get(0).decision());
     }
 
     @Test
@@ -119,7 +126,7 @@ class AgentRuntimeTest {
     }
 
     @Test
-    void runtimeLimitsTurnsAndDoesNotExecuteUnconsumableToolCall() {
+    void runtimeHonorsMaxStepsAndDoesNotExecuteUnconsumableToolCall() {
         AtomicInteger modelCalls = new AtomicInteger();
         AtomicInteger toolCalls = new AtomicInteger();
         var runtime = new AgentRuntime(context -> call("call-" + modelCalls.incrementAndGet()),
@@ -130,7 +137,11 @@ class AgentRuntimeTest {
 
         var stopped = assertInstanceOf(AgentRuntime.Stopped.class, runtime.run("Question"));
 
-        assertEquals(AgentRuntime.StopReason.TURN_LIMIT, stopped.reason());
+        assertEquals(AgentRuntime.StopReason.MAX_STEPS, stopped.reason());
+        assertEquals("maxSteps reached before tool execution: 2", stopped.detail());
+        assertEquals(2, stopped.stepsTaken());
+        assertEquals(2, stopped.steps().get(1).number());
+        assertTrue(stopped.steps().get(1).observation().isEmpty());
         assertEquals(2, modelCalls.get());
         assertEquals(1, toolCalls.get());
         assertEquals(List.of(AgentState.START, AgentState.MODEL, AgentState.TOOL,
@@ -171,6 +182,109 @@ class AgentRuntimeTest {
         var error = assertThrows(IllegalArgumentException.class,
                 () -> new ToolRegistry(List.of(registration, registration)));
         assertEquals("duplicate tool registration: lookup_order", error.getMessage());
+    }
+
+    @Test
+    void expectedToolExceptionBecomesTypedToolFailureAndStopsWithoutRetry() {
+        AtomicInteger modelCalls = new AtomicInteger();
+        AtomicInteger toolCalls = new AtomicInteger();
+        var cause = new IOException("offline fixture operation failed");
+        var failure = new ToolExecutionException("order lookup unavailable", cause);
+        var runtime = new AgentRuntime(context -> {
+            modelCalls.incrementAndGet();
+            return call("failed-call");
+        }, registry(args -> {
+            toolCalls.incrementAndGet();
+            throw failure;
+        }), 3);
+
+        var failed = assertInstanceOf(AgentRuntime.ToolFailed.class, runtime.run("Question"));
+
+        assertEquals(call("failed-call"), failed.call());
+        assertSame(failure, failed.failure());
+        assertSame(cause, failed.failure().getCause());
+        assertEquals("order lookup unavailable", failed.failure().getMessage());
+        assertEquals(1, modelCalls.get());
+        assertEquals(1, toolCalls.get());
+        assertEquals(1, failed.stepsTaken());
+        assertTrue(failed.history().isEmpty());
+        assertTrue(failed.steps().get(0).observation().isEmpty());
+        assertEquals(List.of(AgentState.START, AgentState.MODEL, AgentState.TOOL, AgentState.STOP),
+                failed.trace());
+    }
+
+    @Test
+    void toolFailureKeepsEarlierObservationsWithoutInventingSuccessfulOutput() {
+        AtomicInteger toolCalls = new AtomicInteger();
+        var runtime = new AgentRuntime(context -> call("call-" + context.history().size()),
+                registry(args -> {
+                    if (toolCalls.incrementAndGet() == 1) {
+                        return "first observation";
+                    }
+                    throw new ToolExecutionException("second operation failed");
+                }), 4);
+
+        var failed = assertInstanceOf(AgentRuntime.ToolFailed.class, runtime.run("Question"));
+
+        assertEquals("call-1", failed.call().callId());
+        assertEquals(2, failed.stepsTaken());
+        assertEquals(2, toolCalls.get());
+        assertEquals(List.of(new AgentContext.Exchange(call("call-0"),
+                new ToolResult("call-0", "first observation"))), failed.history());
+        assertEquals("first observation", failed.steps().get(0).observation().orElseThrow().output());
+        assertTrue(failed.steps().get(1).observation().isEmpty());
+    }
+
+    @Test
+    void maxStepsOnePreventsAnyToolExecution() {
+        AtomicInteger toolCalls = new AtomicInteger();
+        var runtime = new AgentRuntime(context -> call("never-executed"), registry(args -> {
+            toolCalls.incrementAndGet();
+            return "must not run";
+        }), 1);
+
+        var stopped = assertInstanceOf(AgentRuntime.Stopped.class, runtime.run("Question"));
+
+        assertEquals(AgentRuntime.StopReason.MAX_STEPS, stopped.reason());
+        assertEquals(1, stopped.stepsTaken());
+        assertEquals(0, toolCalls.get());
+        assertTrue(stopped.history().isEmpty());
+    }
+
+    @Test
+    void finalAnswerOnTheLastAllowedStepIsStillSuccess() {
+        var runtime = new AgentRuntime(new ReplayAgentModel(), registry(new ReplayOrderTool()), 2);
+
+        var completed = assertInstanceOf(AgentRuntime.Completed.class, runtime.run("Question"));
+
+        assertEquals(2, completed.stepsTaken());
+        assertEquals("Replay answer: Order ORD-001: SHIPPED", completed.answer().text());
+    }
+
+    @Test
+    void nonPositiveMaxStepsIsRejectedAtConstruction() {
+        for (int maxSteps : List.of(0, -1)) {
+            var error = assertThrows(IllegalArgumentException.class, () -> new AgentRuntime(
+                    new ReplayAgentModel(), registry(new ReplayOrderTool()), maxSteps));
+            assertEquals("maxSteps must be positive", error.getMessage());
+        }
+    }
+
+    @Test
+    void stepRejectsAnObservationWithTheWrongCallId() {
+        var error = assertThrows(IllegalArgumentException.class, () -> new AgentStep(1,
+                call("original"), Optional.of(new ToolResult("wrong", "SHIPPED"))));
+        assertEquals("observation must match the step's tool callId", error.getMessage());
+    }
+
+    @Test
+    void returnedTraceAndStepsAreImmutable() {
+        var completed = assertInstanceOf(AgentRuntime.Completed.class,
+                new AgentRuntime(new ReplayAgentModel(), registry(new ReplayOrderTool()), 2).run("Question"));
+
+        assertThrows(UnsupportedOperationException.class, () -> completed.steps().clear());
+        assertThrows(UnsupportedOperationException.class, () -> completed.trace().clear());
+        assertThrows(UnsupportedOperationException.class, () -> completed.history().clear());
     }
 
     private static ToolRegistry registry(ToolHandler handler) {

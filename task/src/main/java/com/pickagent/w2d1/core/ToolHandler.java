@@ -2,8 +2,11 @@ package com.pickagent.w2d1.core;
 
 import java.util.Map;
 
-/** Execute exactly one validated tool operation; never invoke the model or control the loop. */
+/**
+ * Execute one validated operation. Expected failures use ToolExecutionException;
+ * unknown programming errors propagate. Never invoke the model or control the loop.
+ */
 @FunctionalInterface
 public interface ToolHandler {
-    String execute(Map<String, String> arguments);
+    String execute(Map<String, String> arguments) throws ToolExecutionException;
 }

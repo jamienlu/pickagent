@@ -26,7 +26,7 @@ public final class ToolRegistry {
         return registrations.values().stream().map(Registration::definition).toList();
     }
 
-    public ToolResult execute(AgentDecision.ToolCall call) {
+    public ToolResult execute(AgentDecision.ToolCall call) throws ToolExecutionException {
         Objects.requireNonNull(call, "call");
         Registration registration = registrations.get(call.toolName());
         if (registration == null) {
