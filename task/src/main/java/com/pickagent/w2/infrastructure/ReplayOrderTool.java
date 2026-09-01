@@ -1,7 +1,7 @@
-package com.pickagent.w2d1.infrastructure;
+package com.pickagent.w2.infrastructure;
 
-import com.pickagent.w2d1.core.ToolDefinition;
-import com.pickagent.w2d1.core.ToolHandler;
+import com.pickagent.w2.core.ToolDefinition;
+import com.pickagent.w2.core.ToolHandler;
 
 import java.util.Map;
 import java.util.Set;

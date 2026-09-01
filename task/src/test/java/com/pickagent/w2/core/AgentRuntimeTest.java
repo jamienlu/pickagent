@@ -1,7 +1,7 @@
-package com.pickagent.w2d1.core;
+package com.pickagent.w2.core;
 
-import com.pickagent.w2d1.infrastructure.ReplayAgentModel;
-import com.pickagent.w2d1.infrastructure.ReplayOrderTool;
+import com.pickagent.w2.infrastructure.ReplayAgentModel;
+import com.pickagent.w2.infrastructure.ReplayOrderTool;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;

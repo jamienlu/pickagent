@@ -1,6 +1,6 @@
 package com.pickagent.w2d2;
 
-import com.pickagent.w2d1.StrictToolContractDemo;
+import com.pickagent.w2.StrictToolContractDemo;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;

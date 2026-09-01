@@ -349,10 +349,10 @@ Prompt caching、服务端存储和 `previous_response_id` 是不同概念；不
 
 项目中的离线 Runtime 示例可参考：
 
-- `com.pickagent.w2d1.core.AgentRuntime`
-- `com.pickagent.w2d1.core.AgentContext`
-- `com.pickagent.w2d1.core.ToolRegistry`
-- `com.pickagent.w2d1.AgentRuntimeDemo`
+- `com.pickagent.w2.core.AgentRuntime`
+- `com.pickagent.w2.core.AgentContext`
+- `com.pickagent.w2.core.ToolRegistry`
+- `com.pickagent.w2.AgentRuntimeDemo`
 
 ## 21. OpenAI 与兼容供应商
 

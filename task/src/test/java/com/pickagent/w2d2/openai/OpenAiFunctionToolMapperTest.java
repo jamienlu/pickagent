@@ -1,8 +1,8 @@
 package com.pickagent.w2d2.openai;
 
 import com.openai.models.responses.FunctionTool;
-import com.pickagent.w2d1.core.ToolDefinition;
-import com.pickagent.w2d1.openai.OpenAiFunctionToolMapper;
+import com.pickagent.w2.core.ToolDefinition;
+import com.pickagent.w2.openai.OpenAiFunctionToolMapper;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

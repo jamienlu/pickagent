@@ -1,4 +1,4 @@
-package com.pickagent.w2d1.core;
+package com.pickagent.w2.core;
 
 import java.util.List;
 import java.util.Objects;

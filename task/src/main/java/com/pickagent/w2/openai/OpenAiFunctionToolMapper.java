@@ -1,8 +1,8 @@
-package com.pickagent.w2d1.openai;
+package com.pickagent.w2.openai;
 
 import com.openai.core.JsonValue;
 import com.openai.models.responses.FunctionTool;
-import com.pickagent.w2d1.core.ToolDefinition;
+import com.pickagent.w2.core.ToolDefinition;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
