@@ -1,8 +1,8 @@
-package com.pickagent.w2d1.infrastructure;
+package com.pickagent.w2.infrastructure;
 
-import com.pickagent.w2d1.core.AgentContext;
-import com.pickagent.w2d1.core.AgentDecision;
-import com.pickagent.w2d1.core.AgentModelPort;
+import com.pickagent.w2.core.AgentContext;
+import com.pickagent.w2.core.AgentDecision;
+import com.pickagent.w2.core.AgentModelPort;
 
 import java.util.Map;
 

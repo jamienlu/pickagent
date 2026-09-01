@@ -1,4 +1,4 @@
-package com.pickagent.w2d1;
+package com.pickagent.w2;
 
 import org.junit.jupiter.api.Test;
 
