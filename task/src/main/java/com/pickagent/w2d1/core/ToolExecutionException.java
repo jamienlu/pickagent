@@ -1,4 +1,4 @@
-package com.pickagent.w2.core;
+package com.pickagent.w2d1.core;
 
 /** Expected tool-operation failure, deliberately classified by the tool adapter. */
 public final class ToolExecutionException extends Exception {

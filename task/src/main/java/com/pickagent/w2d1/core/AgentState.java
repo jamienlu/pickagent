@@ -1,4 +1,4 @@
-package com.pickagent.w2.core;
+package com.pickagent.w2d1.core;
 
 /** Runtime lifecycle; model adapters do not drive these transitions. */
 public enum AgentState {

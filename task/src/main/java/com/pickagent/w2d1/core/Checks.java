@@ -1,4 +1,4 @@
-package com.pickagent.w2.core;
+package com.pickagent.w2d1.core;
 
 final class Checks {
     private Checks() {

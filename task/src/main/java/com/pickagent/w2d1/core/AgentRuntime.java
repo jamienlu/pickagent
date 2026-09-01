@@ -1,4 +1,4 @@
-package com.pickagent.w2.core;
+package com.pickagent.w2d1.core;
 
 import java.util.ArrayList;
 import java.util.HashSet;
