@@ -24,6 +24,7 @@ OpenAI 官方限流文档说明：官方 SDK 会自动重试符合条件的限�
 
 - 应用 adapter 先把 HTTP 状态、供应商错误码和 transport exception 映射成 `FailureKind`。
 - `RetryPolicy` 根据失败分类、已尝试次数、累计等待和可选 `Retry-After`，只返回 `RetryAfter(delay)` 或 `Stop(reason)`。
+- `Retry-After` 是服务器给出的最低等待时间；策略在该下限上追加同一次决策的 jitter，避免多个客户端同时重试。
 - 应用编排层拥有总尝试次数、总时间预算和停止策略；`RetryPolicy` 不执行网络调用，也不 `sleep`。
 - 账单/额度、认证和非法请求不因原样重试而恢复，因此直接停止。
 

@@ -44,13 +44,13 @@ class RetryPolicyTest {
     }
 
     @Test
-    void retryAfterIsTreatedAsTheMinimumDelay() {
+    void retryAfterIsTreatedAsTheMinimumDelayAndJitterIsAdded() {
         var retry = assertInstanceOf(RetryDecision.RetryAfter.class,
                 policy(4, Duration.ofSeconds(30), ignored -> Duration.ofMillis(250))
                         .decide(FailureKind.TRANSIENT_RATE_LIMIT, 1,
                                 Duration.ZERO, Optional.of(Duration.ofSeconds(5))));
 
-        assertEquals(Duration.ofSeconds(5), retry.delay());
+        assertEquals(Duration.ofMillis(5250), retry.delay());
     }
 
     @Test
@@ -101,6 +101,16 @@ class RetryPolicyTest {
                                 Duration.ofSeconds(9), Optional.empty()));
 
         assertEquals("next delay would exceed total wait budget: PT10S", stop.reason());
+    }
+
+    @Test
+    void retryAfterPlusJitterStillRespectsTheTotalWaitBudget() {
+        var stop = assertInstanceOf(RetryDecision.Stop.class,
+                policy(5, Duration.ofSeconds(6), ignored -> Duration.ofMillis(250))
+                        .decide(FailureKind.TRANSIENT_RATE_LIMIT, 1,
+                                Duration.ofSeconds(1), Optional.of(Duration.ofSeconds(5))));
+
+        assertEquals("next delay would exceed total wait budget: PT6S", stop.reason());
     }
 
     @Test

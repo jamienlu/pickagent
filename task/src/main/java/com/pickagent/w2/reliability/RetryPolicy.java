@@ -93,7 +93,9 @@ public final class RetryPolicy {
                 "jitterSource result");
         requireNonNegative(jitter, "jitter");
         Duration calculated = min(saturatedAdd(exponential, jitter), maxBackoff);
-        Duration delay = retryAfter.map(value -> max(value, calculated)).orElse(calculated);
+        Duration delay = retryAfter
+                .map(value -> max(saturatedAdd(value, jitter), calculated))
+                .orElse(calculated);
 
         if (saturatedAdd(totalWaitSoFar, delay).compareTo(maxTotalWait) > 0) {
             return new RetryDecision.Stop("next delay would exceed total wait budget: " + maxTotalWait);
