@@ -40,14 +40,20 @@ public final class ResponseProtocolReplay {
         Objects.requireNonNull(registry, "registry");
 
         List<ResponseOutputItem> firstSnapshot = List.copyOf(firstOutput);
+        OpenAiResponseLedger.PreparedLedger prepared = ledger.prepare(firstSnapshot);
         AgentDecision.ToolCall call = callMapper.map(firstSnapshot);
         ToolResult result = registry.execute(call);
-        List<ResponseInputItem> continuation = ledger.appendToolResult(firstSnapshot, result);
+        List<ResponseInputItem> continuation = ledger.append(prepared, result);
         List<ResponseOutputItem> finalOutput = List.copyOf(Objects.requireNonNull(
                 secondTurn.apply(continuation), "secondTurn returned null"));
 
-        if (finalOutput.stream().anyMatch(ResponseOutputItem::isFunctionCall)) {
-            throw new IllegalStateException("second replay turn must return a final answer, not another function_call");
+        for (ResponseOutputItem item : finalOutput) {
+            if (!item.isReasoning() && !item.isMessage()) {
+                throw new OpenAiResponseLedgerException(
+                        OpenAiResponseLedgerException.Reason.UNEXPECTED_FINAL_OUTPUT_ITEM,
+                        "second replay turn contains non-final output item: "
+                                + OpenAiResponseLedger.itemType(item));
+            }
         }
         String finalAnswer = finalOutput.stream()
                 .filter(ResponseOutputItem::isMessage)

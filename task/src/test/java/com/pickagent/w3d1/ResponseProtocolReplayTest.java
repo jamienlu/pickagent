@@ -1,5 +1,6 @@
 package com.pickagent.w3d1;
 
+import com.openai.models.responses.ResponseFileSearchToolCall;
 import com.openai.models.responses.ResponseFunctionToolCall;
 import com.openai.models.responses.ResponseInputItem;
 import com.openai.models.responses.ResponseOutputItem;
@@ -16,6 +17,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ResponseProtocolReplayTest {
@@ -66,6 +68,45 @@ class ResponseProtocolReplayTest {
         assertEquals("final", result.finalAnswer());
     }
 
+    @Test
+    void invalidFirstTurnProtocolCannotExecuteTheHandler() {
+        AtomicInteger executions = new AtomicInteger();
+        AtomicInteger secondTurns = new AtomicInteger();
+        FirstFixture first = firstOutput();
+
+        var failure = assertThrows(OpenAiResponseLedgerException.class,
+                () -> new ResponseProtocolReplay().run(List.of(
+                                ResponseOutputItem.ofFileSearchCall(fileSearchCall()),
+                                ResponseOutputItem.ofFunctionCall(first.call())),
+                        ignored -> {
+                            secondTurns.incrementAndGet();
+                            return finalOutput("must-not-run");
+                        }, registry(executions)));
+
+        assertEquals(OpenAiResponseLedgerException.Reason.UNKNOWN_OUTPUT_ITEM, failure.reason());
+        assertEquals(0, executions.get(),
+                "complete first-turn protocol validation must precede registry.execute");
+        assertEquals(0, secondTurns.get());
+    }
+
+    @Test
+    void unexpectedSecondTurnToolItemFailsClosed() {
+        AtomicInteger executions = new AtomicInteger();
+
+        var failure = assertThrows(OpenAiResponseLedgerException.class,
+                () -> new ResponseProtocolReplay().run(
+                        firstOutput().items(),
+                        ignored -> List.of(
+                                ResponseOutputItem.ofFileSearchCall(fileSearchCall()),
+                                finalOutput("must-not-be-accepted").getFirst()),
+                        registry(executions)));
+
+        assertEquals(OpenAiResponseLedgerException.Reason.UNEXPECTED_FINAL_OUTPUT_ITEM,
+                failure.reason());
+        assertTrue(failure.getMessage().contains("file_search_call"));
+        assertEquals(1, executions.get(), "the valid first turn executes exactly once");
+    }
+
     private static ToolRegistry registry(AtomicInteger executions) {
         ReplayOrderTool tool = new ReplayOrderTool();
         return new ToolRegistry(List.of(new ToolRegistry.Registration(
@@ -104,6 +145,14 @@ class ResponseProtocolReplayTest {
                         .build())
                 .build();
         return List.of(ResponseOutputItem.ofMessage(message));
+    }
+
+    private static ResponseFileSearchToolCall fileSearchCall() {
+        return ResponseFileSearchToolCall.builder()
+                .id("fs_unexpected")
+                .queries(List.of("order"))
+                .status(ResponseFileSearchToolCall.Status.COMPLETED)
+                .build();
     }
 
     private record FirstFixture(

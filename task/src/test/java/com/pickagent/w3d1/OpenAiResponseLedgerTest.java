@@ -28,11 +28,12 @@ class OpenAiResponseLedgerTest {
         ResponseOutputMessage message = assistantMessage("I will look up the order.");
         ResponseFunctionToolCall call = call("call_001");
 
-        List<ResponseInputItem> input = ledger.appendToolResult(List.of(
+        OpenAiResponseLedger.PreparedLedger prepared = ledger.prepare(List.of(
                 ResponseOutputItem.ofReasoning(reasoning),
                 ResponseOutputItem.ofMessage(message),
-                ResponseOutputItem.ofFunctionCall(call)),
-                new ToolResult("call_001", "SHIPPED"));
+                ResponseOutputItem.ofFunctionCall(call)));
+        List<ResponseInputItem> input = ledger.append(
+                prepared, new ToolResult("call_001", "SHIPPED"));
 
         assertEquals(4, input.size());
         assertTrue(input.get(0).isReasoning());
@@ -48,9 +49,8 @@ class OpenAiResponseLedgerTest {
     @Test
     void zeroFunctionCallsFailFast() {
         var failure = assertThrows(OpenAiResponseLedgerException.class,
-                () -> ledger.appendToolResult(
-                        List.of(ResponseOutputItem.ofReasoning(reasoning())),
-                        new ToolResult("call_001", "unused")));
+                () -> ledger.prepare(
+                        List.of(ResponseOutputItem.ofReasoning(reasoning()))));
 
         assertEquals(OpenAiResponseLedgerException.Reason.NO_FUNCTION_CALL, failure.reason());
     }
@@ -58,20 +58,21 @@ class OpenAiResponseLedgerTest {
     @Test
     void multipleFunctionCallsFailFast() {
         var failure = assertThrows(OpenAiResponseLedgerException.class,
-                () -> ledger.appendToolResult(List.of(
-                                ResponseOutputItem.ofFunctionCall(call("call_001")),
-                                ResponseOutputItem.ofFunctionCall(call("call_002"))),
-                        new ToolResult("call_001", "unused")));
+                () -> ledger.prepare(List.of(
+                        ResponseOutputItem.ofFunctionCall(call("call_001")),
+                        ResponseOutputItem.ofFunctionCall(call("call_002")))));
 
         assertEquals(OpenAiResponseLedgerException.Reason.MULTIPLE_FUNCTION_CALLS, failure.reason());
     }
 
     @Test
     void mismatchedCallIdFailsBeforeAppendingToolOutput() {
+        OpenAiResponseLedger.PreparedLedger prepared = ledger.prepare(
+                List.of(ResponseOutputItem.ofFunctionCall(call("call_expected"))));
+
         var failure = assertThrows(OpenAiResponseLedgerException.class,
-                () -> ledger.appendToolResult(
-                        List.of(ResponseOutputItem.ofFunctionCall(call("call_expected"))),
-                        new ToolResult("call_other", "must-not-append")));
+                () -> ledger.append(
+                        prepared, new ToolResult("call_other", "must-not-append")));
 
         assertEquals(OpenAiResponseLedgerException.Reason.CALL_ID_MISMATCH, failure.reason());
         assertTrue(failure.getMessage().contains("call_expected"));
@@ -87,10 +88,9 @@ class OpenAiResponseLedgerTest {
                 .build();
 
         var failure = assertThrows(OpenAiResponseLedgerException.class,
-                () -> ledger.appendToolResult(List.of(
-                                ResponseOutputItem.ofFileSearchCall(unsupported),
-                                ResponseOutputItem.ofFunctionCall(call("call_001"))),
-                        new ToolResult("call_001", "unused")));
+                () -> ledger.prepare(List.of(
+                        ResponseOutputItem.ofFileSearchCall(unsupported),
+                        ResponseOutputItem.ofFunctionCall(call("call_001")))));
 
         assertEquals(OpenAiResponseLedgerException.Reason.UNKNOWN_OUTPUT_ITEM, failure.reason());
         assertTrue(failure.getMessage().contains("file_search_call"));
@@ -101,12 +101,16 @@ class OpenAiResponseLedgerTest {
         List<ResponseOutputItem> source = new ArrayList<>();
         source.add(ResponseOutputItem.ofFunctionCall(call("call_001")));
 
-        List<ResponseInputItem> snapshot = ledger.appendToolResult(
-                source, new ToolResult("call_001", "SHIPPED"));
+        OpenAiResponseLedger.PreparedLedger prepared = ledger.prepare(source);
         source.clear();
+        List<ResponseInputItem> snapshot = ledger.append(
+                prepared, new ToolResult("call_001", "SHIPPED"));
 
         assertEquals(2, snapshot.size());
         assertFalse(snapshot.isEmpty());
+        assertEquals(1, prepared.protocolItems().size());
+        assertThrows(UnsupportedOperationException.class,
+                () -> prepared.protocolItems().clear());
         assertThrows(UnsupportedOperationException.class,
                 () -> snapshot.add(ResponseInputItem.ofReasoning(reasoning())));
     }

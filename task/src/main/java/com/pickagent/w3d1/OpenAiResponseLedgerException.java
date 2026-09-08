@@ -38,6 +38,8 @@ public final class OpenAiResponseLedgerException extends IllegalArgumentExceptio
         /** The result references a different call than the output history. */
         CALL_ID_MISMATCH,
         /** An output item is outside the ledger's explicitly supported set. */
-        UNKNOWN_OUTPUT_ITEM
+        UNKNOWN_OUTPUT_ITEM,
+        /** The final replay response contains a non-final protocol item. */
+        UNEXPECTED_FINAL_OUTPUT_ITEM
     }
 }
