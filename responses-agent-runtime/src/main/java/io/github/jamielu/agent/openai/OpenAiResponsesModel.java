@@ -2,197 +2,128 @@ package io.github.jamielu.agent.openai;
 
 import com.openai.client.OpenAIClient;
 import com.openai.models.responses.Response;
-import com.openai.models.responses.ResponseCreateParams;
-import com.openai.models.responses.ResponseInputItem;
-import com.openai.models.responses.ResponseOutputItem;
 import io.github.jamielu.agent.api.AgentContext;
 import io.github.jamielu.agent.api.AgentDecision;
-import io.github.jamielu.agent.api.ToolDefinition;
 import io.github.jamielu.agent.runtime.AgentModelPort;
 
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Stateful, single-run {@link AgentModelPort} backed by the OpenAI Responses API.
+ * 基于 OpenAI Responses API 的单次运行有状态模型适配器。
  *
- * <p>The adapter uses {@code previous_response_id} for continuation and sends
- * only the matching {@code function_call_output} on the next request. It sets
- * {@code parallel_tool_calls=false} so every provider turn fits the core port's
- * zero-or-one-call decision contract. Instructions and tools are repeated on
- * every request.</p>
+ * <p>适配器使用 {@code previous_response_id} 续接，并在下一请求中只发送匹配的
+ * {@code function_call_output}。它固定 {@code parallel_tool_calls=false}，使每轮供应商
+ * 响应符合核心端口“零或一个调用”的契约；每轮都会重新发送指令和工具定义。</p>
  *
- * <p>Create one instance per {@link io.github.jamielu.agent.runtime.AgentRuntime#run(String)}
- * with {@link io.github.jamielu.agent.runtime.AgentRuntime#withModelFactory}.
- * Instances are deliberately stateful and must not be shared by concurrent runs.</p>
+ * <p>每次 {@link io.github.jamielu.agent.runtime.AgentRuntime#run(String)} 应通过
+ * {@link io.github.jamielu.agent.runtime.AgentRuntime#withModelFactory} 创建一个实例。
+ * 实例刻意保存协议状态，不得由并发运行共享。</p>
  */
 public final class OpenAiResponsesModel implements AgentModelPort {
     private final OpenAiResponsesTransport transport;
-    private final String model;
-    private final Optional<String> instructions;
-    private final OpenAiFunctionToolMapper toolMapper = new OpenAiFunctionToolMapper();
-    private final OpenAiFunctionCallMapper callMapper = new OpenAiFunctionCallMapper();
-    private final OpenAiFunctionCallOutputMapper outputMapper = new OpenAiFunctionCallOutputMapper();
-
-    private String initialInput;
-    private List<ToolDefinition> initialTools = List.of();
-    private String previousResponseId;
-    private String pendingCallId;
-    private int historySizeAtDecision;
+    private final OpenAiConversation conversation;
+    private final OpenAiResponseDecoder decoder = new OpenAiResponseDecoder();
 
     /**
-     * Creates an adapter using a configured blocking SDK client.
+     * 使用已配置的阻塞式 SDK 客户端创建适配器。
      *
-     * @param client configured OpenAI client
-     * @param model non-blank Responses model identifier
-     * @param instructions optional non-blank instructions repeated every turn
+     * @param client 已配置 SDK 客户端
+     * @param model 非空白模型标识
+     * @param instructions 每轮重复发送的可选指令
      */
     public OpenAiResponsesModel(OpenAIClient client, String model, Optional<String> instructions) {
-        this(OpenAiResponsesTransport.fromClient(client), model, instructions);
+        this(OpenAiResponsesTransport.fromClient(client), model, instructions,
+                OpenAiResponseOptions.defaults());
     }
 
     /**
-     * Creates an adapter using an injectable transport.
+     * 使用已配置 SDK 客户端和显式请求选项创建适配器。
      *
-     * @param transport Responses create boundary
-     * @param model non-blank Responses model identifier
-     * @param instructions optional non-blank instructions repeated every turn
+     * @param client 已配置 SDK 客户端
+     * @param model 非空白模型标识
+     * @param instructions 每轮重复发送的可选指令
+     * @param options 输出和存储选项
+     */
+    public OpenAiResponsesModel(
+            OpenAIClient client,
+            String model,
+            Optional<String> instructions,
+            OpenAiResponseOptions options) {
+        this(OpenAiResponsesTransport.fromClient(client), model, instructions, options);
+    }
+
+    /**
+     * 使用可注入传输边界创建适配器。
+     *
+     * @param transport Responses 创建边界
+     * @param model 非空白模型标识
+     * @param instructions 每轮重复发送的可选指令
      */
     public OpenAiResponsesModel(
             OpenAiResponsesTransport transport,
             String model,
             Optional<String> instructions) {
-        this.transport = Objects.requireNonNull(transport, "transport");
-        this.model = requireNonBlank(model, "model");
-        this.instructions = Objects.requireNonNull(instructions, "instructions")
-                .map(value -> requireNonBlank(value, "instructions"));
+        this(transport, model, instructions, OpenAiResponseOptions.defaults());
     }
 
     /**
-     * Creates an adapter without request-level instructions.
+     * 使用可注入传输边界和显式请求选项创建适配器。
      *
-     * @param client configured OpenAI client
-     * @param model non-blank Responses model identifier
+     * @param transport Responses 创建边界
+     * @param model 非空白 Responses 模型标识
+     * @param instructions 每轮重复发送的可选非空白指令
+     * @param options 输出和存储选项
+     */
+    public OpenAiResponsesModel(
+            OpenAiResponsesTransport transport,
+            String model,
+            Optional<String> instructions,
+            OpenAiResponseOptions options) {
+        this.transport = Objects.requireNonNull(transport, "transport");
+        String checkedModel = requireNonBlank(model, "model");
+        Optional<String> checkedInstructions = Objects.requireNonNull(instructions, "instructions")
+                .map(value -> requireNonBlank(value, "instructions"));
+        this.conversation = new OpenAiConversation(
+                checkedModel, checkedInstructions, Objects.requireNonNull(options, "options"));
+    }
+
+    /**
+     * 创建不携带请求级指令的 SDK 适配器。
+     *
+     * @param client 已配置 SDK 客户端
+     * @param model 非空白模型标识
      */
     public OpenAiResponsesModel(OpenAIClient client, String model) {
         this(client, model, Optional.empty());
     }
 
     /**
-     * Creates an injectable adapter without request-level instructions.
+     * 创建不携带请求级指令的可注入适配器。
      *
-     * @param transport Responses create boundary
-     * @param model non-blank Responses model identifier
+     * @param transport Responses 创建边界
+     * @param model 非空白模型标识
      */
     public OpenAiResponsesModel(OpenAiResponsesTransport transport, String model) {
         this(transport, model, Optional.empty());
     }
 
-    /**
-     * Sends an initial request or a call-output continuation based on the
-     * immutable Runtime context.
-     */
+    /** 根据不可变运行时上下文发送首轮请求或工具结果续接请求。 */
     @Override
     public AgentDecision decide(AgentContext context) {
         Objects.requireNonNull(context, "context");
-        ResponseCreateParams params = context.history().isEmpty()
-                ? initialParams(context)
-                : continuationParams(context);
-
         Response response = Objects.requireNonNull(
-                transport.create(params), "transport returned null response");
+                transport.create(conversation.nextRequest(context)),
+                "transport returned null response");
         if (response.id().isBlank()) {
             throw new OpenAiResponsesModelException(
                     OpenAiResponsesModelException.Reason.INVALID_RESPONSE_ID,
                     "Responses API returned a blank response id");
         }
 
-        AgentDecision decision = mapDecision(response.output());
-        previousResponseId = response.id();
-        historySizeAtDecision = context.history().size();
-        pendingCallId = decision instanceof AgentDecision.ToolCall call
-                ? call.callId()
-                : null;
+        AgentDecision decision = decoder.decode(response.output());
+        conversation.accept(response.id(), decision, context.history().size());
         return decision;
-    }
-
-    private ResponseCreateParams initialParams(AgentContext context) {
-        initialInput = context.input();
-        initialTools = List.copyOf(context.tools());
-        previousResponseId = null;
-        pendingCallId = null;
-        historySizeAtDecision = 0;
-        return baseParams(context.tools()).input(context.input()).build();
-    }
-
-    private ResponseCreateParams continuationParams(AgentContext context) {
-        if (previousResponseId == null || pendingCallId == null) {
-            throw contextMismatch("no function call is pending for continuation");
-        }
-        if (!context.input().equals(initialInput) || !context.tools().equals(initialTools)) {
-            throw contextMismatch("input or tool definitions changed during one run");
-        }
-        if (context.history().size() != historySizeAtDecision + 1) {
-            throw contextMismatch("expected exactly one new tool exchange");
-        }
-        AgentContext.Exchange exchange = context.history().getLast();
-        if (!exchange.call().callId().equals(pendingCallId)) {
-            throw contextMismatch("tool history does not match pending callId: " + pendingCallId);
-        }
-
-        ResponseInputItem.FunctionCallOutput output = outputMapper.map(exchange.result());
-        return baseParams(context.tools())
-                .previousResponseId(previousResponseId)
-                .inputOfResponse(List.of(ResponseInputItem.ofFunctionCallOutput(output)))
-                .build();
-    }
-
-    private ResponseCreateParams.Builder baseParams(List<ToolDefinition> tools) {
-        ResponseCreateParams.Builder builder = ResponseCreateParams.builder()
-                .model(model)
-                .parallelToolCalls(false)
-                .store(true);
-        instructions.ifPresent(builder::instructions);
-        tools.stream().map(toolMapper::map).forEach(builder::addTool);
-        return builder;
-    }
-
-    private AgentDecision mapDecision(List<ResponseOutputItem> outputItems) {
-        List<ResponseOutputItem> snapshot = List.copyOf(
-                Objects.requireNonNull(outputItems, "response output"));
-        boolean hasFunctionCall = snapshot.stream().anyMatch(ResponseOutputItem::isFunctionCall);
-        if (hasFunctionCall) {
-            // Validates the complete heterogeneous output before the Runtime can execute a handler.
-            new OpenAiResponseLedger().prepare(snapshot);
-            return callMapper.map(snapshot);
-        }
-
-        for (ResponseOutputItem item : snapshot) {
-            if (!item.isReasoning() && !item.isMessage()) {
-                throw new OpenAiResponsesModelException(
-                        OpenAiResponsesModelException.Reason.UNEXPECTED_FINAL_OUTPUT_ITEM,
-                        "terminal response contains unsupported output item: "
-                                + OpenAiResponseLedger.itemType(item));
-            }
-        }
-        String answer = snapshot.stream()
-                .filter(ResponseOutputItem::isMessage)
-                .flatMap(item -> item.asMessage().content().stream())
-                .filter(content -> content.outputText().isPresent())
-                .map(content -> content.asOutputText().text())
-                .reduce("", String::concat);
-        if (answer.isBlank()) {
-            throw new OpenAiResponsesModelException(
-                    OpenAiResponsesModelException.Reason.MISSING_FINAL_TEXT,
-                    "terminal response did not contain output text");
-        }
-        return new AgentDecision.FinalAnswer(answer);
-    }
-
-    private static OpenAiResponsesModelException contextMismatch(String message) {
-        return new OpenAiResponsesModelException(
-                OpenAiResponsesModelException.Reason.CONTEXT_MISMATCH, message);
     }
 
     private static String requireNonBlank(String value, String field) {

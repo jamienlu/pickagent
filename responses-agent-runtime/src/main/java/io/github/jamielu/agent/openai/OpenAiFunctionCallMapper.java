@@ -14,26 +14,17 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.HashSet;
 
-/**
- * Maps OpenAI Responses function calls into provider-neutral calls.
- *
- * <p>Non-function output items, including reasoning items, are traversed but not represented by the current
- * core type. This mapper parses provider JSON only; it neither validates a registered tool contract nor executes
- * a tool.</p>
- *
- */
+/** 将 OpenAI Responses 函数调用映射为供应商中立调用。 */
 public final class OpenAiFunctionCallMapper {
-    /** Creates a stateless inbound mapper. */
+    /** 创建无状态入站映射器。 */
     public OpenAiFunctionCallMapper() {
     }
 
     /**
-     * Finds exactly one function call and converts its string-only JSON arguments.
+     * 查找唯一函数调用并转换其纯字符串 JSON 参数。
      *
-     * @param outputItems heterogeneous Responses output items
-     * @return provider-neutral tool-call decision
-     * @throws NullPointerException when outputItems or an item is null
-     * @throws OpenAiFunctionCallMappingException when the output cannot be represented safely
+     * @param outputItems Responses 异构输出条目
+     * @return 唯一供应商中立工具调用
      */
     public AgentDecision.ToolCall map(List<ResponseOutputItem> outputItems) {
         List<AgentDecision.ToolCall> calls = mapAll(outputItems);
@@ -46,10 +37,10 @@ public final class OpenAiFunctionCallMapper {
     }
 
     /**
-     * Maps every function call in response order without executing a tool.
+     * 按响应顺序映射全部函数调用且不执行工具。
      *
-     * @param outputItems heterogeneous Responses output items
-     * @return immutable, non-empty call list
+     * @param outputItems Responses 异构输出条目
+     * @return 按响应顺序排列的不可变工具调用集合
      */
     public List<AgentDecision.ToolCall> mapAll(List<ResponseOutputItem> outputItems) {
         Objects.requireNonNull(outputItems, "outputItems");
@@ -88,7 +79,7 @@ public final class OpenAiFunctionCallMapper {
     }
 
     private static Map<String, String> parseStringArguments(String encodedArguments) {
-        if (encodedArguments == null || encodedArguments.isBlank()) {
+        if (encodedArguments.isBlank()) {
             throw malformedArguments(null);
         }
         Object parsed;

@@ -4,24 +4,16 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
 
-/**
- * Pure retry decision logic with bounded exponential backoff and injected jitter.
- *
- * <p>{@code attemptsMade} includes the request that has just failed. For
- * example, {@code attemptsMade == 1} asks whether to schedule the first retry.
- * The total-time budget in this exercise is represented by cumulative waiting
- * time; request execution time can be added to that value by a production
- * orchestrator if its budget includes both execution and waiting.</p>
- */
+/** 使用有界指数退避和可注入抖动的纯重试决策逻辑。 */
 public final class RetryPolicy {
-    /** Supplies a non-negative jitter duration for a calculated backoff. */
+    /** 提供计算后退避所需的非负抖动时长。 */
     @FunctionalInterface
     public interface JitterSource {
         /**
-         * Calculates jitter for one exponential delay.
+         * 为一次指数退避计算抖动。
          *
-         * @param exponentialBackoff bounded exponential component
-         * @return a non-negative jitter duration
+         * @param exponentialBackoff 当前指数退避时长
+         * @return 需要追加的非负抖动时长
          */
         Duration jitterFor(Duration exponentialBackoff);
     }
@@ -33,13 +25,13 @@ public final class RetryPolicy {
     private final JitterSource jitterSource;
 
     /**
-     * Creates a retry policy.
+     * 创建重试策略。
      *
-     * @param maxAttempts maximum total attempts, including the initial request
-     * @param maxTotalWait maximum cumulative retry delay
-     * @param baseDelay delay used before the first retry
-     * @param maxBackoff upper bound for calculated backoff plus jitter
-     * @param jitterSource deterministic or random jitter provider
+     * @param maxAttempts 包含首次尝试的最大尝试次数
+     * @param maxTotalWait 允许累计等待的最大时长
+     * @param baseDelay 首次重试的基础等待时长
+     * @param maxBackoff 单次计算退避上限
+     * @param jitterSource 可注入抖动来源
      */
     public RetryPolicy(int maxAttempts, Duration maxTotalWait, Duration baseDelay,
                        Duration maxBackoff, JitterSource jitterSource) {
@@ -60,13 +52,13 @@ public final class RetryPolicy {
     }
 
     /**
-     * Decides whether and when another attempt may be made.
+     * 判断是否重试以及下一次重试等待时长。
      *
-     * @param failureKind provider-neutral failure category
-     * @param attemptsMade attempts already made, including the just-failed one
-     * @param totalWaitSoFar retry delay already consumed
-     * @param retryAfter optional server-provided minimum delay
-     * @return a retry delay or a terminal stop reason
+     * @param failureKind 供应商中立失败分类
+     * @param attemptsMade 已完成尝试次数
+     * @param totalWaitSoFar 已累计等待时长
+     * @param retryAfter 可选服务端最小等待建议
+     * @return 等待后重试或停止决策
      */
     public RetryDecision decide(FailureKind failureKind, int attemptsMade,
                                 Duration totalWaitSoFar, Optional<Duration> retryAfter) {

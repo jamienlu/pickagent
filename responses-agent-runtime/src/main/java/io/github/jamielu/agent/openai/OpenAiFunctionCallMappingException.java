@@ -2,19 +2,16 @@ package io.github.jamielu.agent.openai;
 
 import java.util.Objects;
 
-/**
- * Explicit failure while mapping heterogeneous OpenAI output to core calls.
- *
- */
+/** 将异构 OpenAI 输出映射到核心调用时的明确失败。 */
 public final class OpenAiFunctionCallMappingException extends IllegalArgumentException {
-    /** Stable category for programmatic handling. */
+    /** 供程序化处理的稳定分类。 */
     private final Reason reason;
 
     /**
-     * Creates a mapping failure without a nested parser failure.
+     * 创建不含嵌套解析失败的映射异常。
      *
-     * @param reason stable failure category
-     * @param message diagnostic message
+     * @param reason 稳定失败分类
+     * @param message 不包含秘密的诊断消息
      */
     public OpenAiFunctionCallMappingException(Reason reason, String message) {
         super(message);
@@ -22,11 +19,11 @@ public final class OpenAiFunctionCallMappingException extends IllegalArgumentExc
     }
 
     /**
-     * Creates a mapping failure caused by malformed provider data.
+     * 创建由供应商数据格式错误引起的映射异常。
      *
-     * @param reason stable failure category
-     * @param message diagnostic message
-     * @param cause original parser failure
+     * @param reason 稳定失败分类
+     * @param message 不包含秘密的诊断消息
+     * @param cause 底层解析失败
      */
     public OpenAiFunctionCallMappingException(Reason reason, String message, Throwable cause) {
         super(message, cause);
@@ -34,29 +31,29 @@ public final class OpenAiFunctionCallMappingException extends IllegalArgumentExc
     }
 
     /**
-     * Returns the machine-readable failure category.
+     * 返回机器可读的失败分类。
      *
-     * @return mapping failure category
+     * @return 稳定失败分类
      */
     public Reason reason() {
         return reason;
     }
 
-    /** Categories that callers can handle without parsing exception text. */
+    /** 调用方无需解析异常文本即可处理的分类。 */
     public enum Reason {
-        /** No function call was present in the output items. */
+        /** 输出条目中没有函数调用。 */
         NO_FUNCTION_CALL,
-        /** More than one function call was present but the core supports one. */
+        /** 函数调用超过一个而核心端口只支持一个。 */
         MULTIPLE_FUNCTION_CALLS,
-        /** Two function calls reused the same correlation id. */
+        /** 两个函数调用复用了同一关联标识。 */
         DUPLICATE_CALL_ID,
-        /** The arguments field was not valid JSON. */
+        /** 参数字段不是有效 JSON。 */
         MALFORMED_ARGUMENTS_JSON,
-        /** The parsed arguments root was not a JSON object. */
+        /** 解析后的参数根节点不是 JSON 对象。 */
         ARGUMENTS_NOT_OBJECT,
-        /** A JSON object member was not a string. */
+        /** JSON 对象成员不是字符串。 */
         NON_STRING_ARGUMENT,
-        /** A required call identifier or function name was blank. */
+        /** 必需的调用标识或函数名称为空白。 */
         INVALID_FUNCTION_CALL_FIELD
     }
 }

@@ -1,24 +1,18 @@
 package io.github.jamielu.agent.reliability;
 
-/**
- * Provider-neutral failure categories used by the retry boundary.
- *
- * <p>HTTP status codes and provider error payloads are translated into these
- * categories before the policy is called. In particular, not every HTTP 429
- * is a transient rate limit.</p>
- */
+/** 供重试边界使用的供应商中立失败分类。 */
 public enum FailureKind {
-    /** A temporary request/token/ramp rate limit. */
+    /** 临时请求、令牌或爬坡限流。 */
     TRANSIENT_RATE_LIMIT(true),
-    /** A provider or model that is temporarily overloaded. */
+    /** 供应商或模型暂时过载。 */
     SERVICE_OVERLOADED(true),
-    /** A transport or provider timeout. */
+    /** 传输或供应商超时。 */
     TIMEOUT(true),
-    /** A credit, billing, spend-limit or usage-quota failure. */
+    /** 余额、账单、消费上限或额度失败。 */
     BILLING_OR_QUOTA(false),
-    /** Invalid, expired, revoked or unauthorized credentials. */
+    /** 无效、过期、撤销或未授权凭据。 */
     AUTHENTICATION(false),
-    /** A malformed or semantically invalid request. */
+    /** 格式或语义无效的请求。 */
     INVALID_REQUEST(false);
 
     private final boolean retryable;
@@ -28,9 +22,9 @@ public enum FailureKind {
     }
 
     /**
-     * Reports whether retrying can be useful for this category.
+     * 判断该失败分类是否值得在预算内重试。
      *
-     * @return whether this category can be retried when budgets still allow it
+     * @return 该分类可在预算内重试时为 {@code true}
      */
     public boolean retryable() {
         return retryable;

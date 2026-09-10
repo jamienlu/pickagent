@@ -6,31 +6,32 @@ import com.openai.models.responses.ResponseCreateParams;
 
 import java.util.Objects;
 
-/**
- * Minimal blocking transport boundary for creating OpenAI Responses.
- *
- * <p>The functional shape keeps request construction testable without network
- * access while {@link #fromClient(OpenAIClient)} provides the production SDK
- * bridge.</p>
- */
+/** 创建 OpenAI Responses 的最小阻塞传输边界。 */
 @FunctionalInterface
 public interface OpenAiResponsesTransport {
     /**
-     * Sends one Responses create request.
+     * 发送一次 Responses 创建请求。
      *
-     * @param params complete SDK request parameters
-     * @return non-null SDK response
+     * @param params 已完整构建的 SDK 请求参数
+     * @return SDK 响应
      */
     Response create(ResponseCreateParams params);
 
     /**
-     * Adapts a blocking OpenAI Java SDK client.
+     * 适配阻塞式 OpenAI Java SDK 客户端。
      *
-     * @param client configured SDK client
-     * @return transport that delegates to {@code client.responses().create}
+     * @param client 已配置 SDK 客户端
+     * @return 映射 SDK 异常的阻塞传输边界
      */
     static OpenAiResponsesTransport fromClient(OpenAIClient client) {
         OpenAIClient checked = Objects.requireNonNull(client, "client");
-        return params -> checked.responses().create(params);
+        OpenAiExceptionMapper exceptionMapper = new OpenAiExceptionMapper();
+        return params -> {
+            try {
+                return checked.responses().create(params);
+            } catch (com.openai.errors.OpenAIException failure) {
+                throw exceptionMapper.map(failure);
+            }
+        };
     }
 }

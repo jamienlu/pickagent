@@ -11,28 +11,17 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * Preserves the OpenAI Responses protocol items needed to continue one or more
- * reasoning-model tool calls.
- *
- * <p>The ledger wraps the original SDK reasoning, assistant-message and
- * function-call objects as input items. It does not rebuild their fields. This
- * preserves opaque reasoning content, message metadata, provider extensions,
- * ordering and the original {@code call_id}.</p>
- */
+/** 保留一个或多个推理模型工具调用续接所需的 Responses 协议条目。 */
 public final class OpenAiResponseLedger {
-    /** Creates a stateless protocol ledger. */
+    /** 创建无状态协议账本。 */
     public OpenAiResponseLedger() {
     }
 
     /**
-     * Validates and converts a response output history without executing a tool
-     * or performing any other side effect.
+     * 在不执行工具或其他副作用的前提下校验并转换响应输出历史。
      *
-     * @param outputItems heterogeneous output items from the preceding response
-     * @return immutable prepared protocol history
-     * @throws NullPointerException if the list or one of its elements is null
-     * @throws OpenAiResponseLedgerException if the history cannot be continued safely
+     * @param outputItems 首轮 Responses 异构输出条目
+     * @return 完整校验且保持顺序的协议账本
      */
     public PreparedLedger prepare(List<ResponseOutputItem> outputItems) {
         Objects.requireNonNull(outputItems, "outputItems");
@@ -78,25 +67,22 @@ public final class OpenAiResponseLedger {
     }
 
     /**
-     * Appends an executed result to a previously validated protocol history.
+     * 向已校验协议历史追加一个执行结果。
      *
-     * @param prepared side-effect-free result of {@link #prepare(List)}
-     * @param toolResult locally executed tool result
-     * @return immutable continuation-input snapshot
-     * @throws NullPointerException if an argument is null
-     * @throws OpenAiResponseLedgerException if the result targets another call
+     * @param prepared 已完整校验的协议账本
+     * @param toolResult 唯一工具执行结果
+     * @return 可发送到续接请求的不可变输入条目
      */
     public List<ResponseInputItem> append(PreparedLedger prepared, ToolResult toolResult) {
         return appendAll(prepared, List.of(Objects.requireNonNull(toolResult, "toolResult")));
     }
 
     /**
-     * Appends a complete result batch after all calls have executed successfully.
-     * Results must match calls by count and response order.
+     * 所有调用成功后按响应顺序追加完整结果批次。
      *
-     * @param prepared validated protocol history and function calls
-     * @param toolResults completed results in response-call order
-     * @return immutable continuation input containing history followed by outputs
+     * @param prepared 已完整校验的协议账本
+     * @param toolResults 与函数调用顺序和数量精确匹配的结果
+     * @return 可发送到续接请求的不可变输入条目
      */
     public List<ResponseInputItem> appendAll(
             PreparedLedger prepared,
@@ -149,10 +135,7 @@ public final class OpenAiResponseLedger {
         return "unknown";
     }
 
-    /**
-     * Immutable, fully validated first-turn protocol history. Instances can
-     * only be created by {@link OpenAiResponseLedger#prepare(List)}.
-     */
+    /** 不可变且已经完整验证的首轮协议历史。 */
     public static final class PreparedLedger {
         private final List<ResponseInputItem> protocolItems;
         private final List<ResponseFunctionToolCall> functionCalls;
@@ -165,18 +148,18 @@ public final class OpenAiResponseLedger {
         }
 
         /**
-         * Returns the immutable input items in their original order.
+         * 返回保持原始顺序的不可变输入条目。
          *
-         * @return validated protocol items, without a tool result
+         * @return 首轮协议输入条目
          */
         public List<ResponseInputItem> protocolItems() {
             return protocolItems;
         }
 
         /**
-         * Returns all function calls in their original response order.
+         * 返回保持原始响应顺序的全部函数调用。
          *
-         * @return immutable original SDK function-call objects
+         * @return 首轮全部函数调用
          */
         public List<ResponseFunctionToolCall> functionCalls() {
             return functionCalls;

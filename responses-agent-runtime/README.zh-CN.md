@@ -12,11 +12,16 @@
 - 保留 reasoning、助手消息、调用及匹配结果的协议账本。
 - 使用 `previous_response_id` 的阻塞式 Responses transport 边界和有状态 `AgentModelPort` adapter。
 - 按每次运行创建模型的工厂，隔离不同 Runtime 运行的供应商会话状态。
+- 跨轮模型调用、工具调用和单调时长预算；每个终态都携带不可变消耗快照。
 - 包含无副作用批次预检的可信工具注册表。
 - 采用 fail-closed 错误处理的确定性串行批次执行。
 - 包含指数退避、`Retry-After`、抖动和总等待预算的纯重试决策。
 - 用于确定性本地验证的进程内幂等语义。
-- 离线 SDK fixture 和契约测试；默认构建不需要 API Key。
+- OpenAI SDK 异常类型化映射，以及由 SDK 独占的 transport 重试边界。
+- 凭据、模型、超时、重试、输出上限、续接存储和 Runtime 预算均使用外置在线配置。
+- Maven 隔离默认、offline、online 和 live 源码集；默认构建无需 API Key、网络或付费请求。
+- 默认 171 个测试，强制 100% 行/分支覆盖率、ArchUnit 边界和零警告 Javadoc。
+- 配置档专属覆盖率门禁：offline 172 个测试、online 179 个测试，均无需凭据、网络访问或付费请求。
 
 ## 包边界
 
@@ -25,20 +30,23 @@ io.github.jamielu.agent.api
     只存放供应商中立的 record 和生命周期类型
 
 io.github.jamielu.agent.runtime
-    Agent 循环、模型端口、状态转换和停止预算
+    Agent 循环、模型端口、状态转换、全局预算和消耗
 
 io.github.jamielu.agent.tool
     工具白名单、契约校验、预检和分发
 
 io.github.jamielu.agent.openai
-    OpenAI SDK 映射、实时 transport 桥接、有状态模型 adapter
-    和 Responses 协议续接账本
+    OpenAI SDK 映射、transport 边界、会话状态、响应解码、
+    类型化错误映射和 Responses 协议续接账本
+
+io.github.jamielu.agent.online
+    外置配置校验、SDK 客户端创建和资源生命周期
 
 io.github.jamielu.agent.reliability
     重试和幂等策略
 
-io.github.jamielu.agent.example
-    可复现的离线入口和 fixture adapter
+src/offline 与 src/online
+    配置档隔离的离线证明和显式在线 CLI 入口
 ```
 
 Runtime 和 API 包不导入 OpenAI SDK 类型。依赖方向从 adapter 指向供应商中立 API，而不是从 Runtime 指向具体供应商。
@@ -47,7 +55,9 @@ Runtime 和 API 包不导入 OpenAI SDK 类型。依赖方向从 adapter 指向�
 
 `AgentRuntime` 实现完整的供应商中立循环：它可以反复请求模型决策，每一步最多执行一次已验证的工具调用，并在得到最终回答或命中明确的预算/安全条件时停止。
 
-`OpenAiResponsesModel` 通过可注入的 `OpenAiResponsesTransport` 把该循环连接到 `responses.create`。第一轮发送用户文本，后续轮次通过上一响应 ID 发送最新且匹配的 `function_call_output`。每一轮都重复传入 model、instructions 和工具；`store=true` 启用服务端续接，`parallel_tool_calls=false` 使供应商每次决策符合核心端口零或一次调用的契约。应使用 `AgentRuntime.withModelFactory` 为每次运行创建一个 adapter。
+`OpenAiResponsesModel` 协调 `OpenAiConversation`、`OpenAiResponseDecoder` 和可注入的 `OpenAiResponsesTransport`。第一轮发送用户文本，后续轮次通过上一响应 ID 发送最新且匹配的 `function_call_output`。model、instructions、工具、输出上限与存储选项保持一致；`parallel_tool_calls=false` 使供应商每次决策符合核心端口零或一次调用的契约。`OpenAiOnlineRunner` 为每次在线运行创建并关闭独立 SDK 会话。
+
+`RunBudget` 在整个循环中限制模型调用数、应用工具调用数和单调总时长。预算在模型请求与工具副作用前检查。`Completed`、`Stopped`、`ModelFailed` 和 `ToolFailed` 都包含不可变 `RunUsage` 快照。
 
 `OpenAiResponseReplay` 继续作为聚焦协议的离线 adapter，验证一个 Responses 工具调用批次以及紧随其后的续接轮次：
 
@@ -69,19 +79,21 @@ response.output
 ```powershell
 $env:JAVA_HOME = 'C:\sdk\Java\jdk-21'
 $env:Path = "$env:JAVA_HOME\bin;$env:Path"
-mvn "-P!jdk-17" clean test
-mvn "-P!jdk-17" exec:java
+mvn "-P!jdk-17" clean verify
+mvn "-P!jdk-17,offline" clean verify exec:java
+mvn "-P!jdk-17,online" clean verify
+mvn "-P!jdk-17,live" -DskipITs test-compile
 ```
 
-演示完全离线运行。当协议顺序、调用关联和工具执行不变量全部成立时，会输出 `ledger.proof=PASS`。
+离线 Demo 会输出 `ledger.proof=PASS`、两次模型调用和一次工具调用。online 验证与 live 编译不会发送请求。任何明确审批的在线运行前都应阅读[配置说明](docs/configuration.zh-CN.md)。
 
 ## 当前范围
 
 - 函数参数目前仅支持必填字符串字段。
 - 多个调用会先统一预检，再串行执行；尚未实现线程池并行。
-- 阻塞式 SDK transport 和多步 Runtime adapter 已实现，但默认 Demo 与测试套件使用 SDK fixture，绝不会发送真实 OpenAI 请求。
+- 阻塞式 SDK transport 和多步 Runtime adapter 已实现，但默认构建与 offline 配置档绝不会发送 live 请求。
 - 实时 adapter 刻意禁用并行工具调用；`OpenAiResponseReplay` 继续离线覆盖确定性的多调用批次。
-- 尚无带凭据的实时兼容性、模型行为、延迟或成本证据。
+- 带凭据 smoke 测试只存在于显式 `live` 配置档中；普通验收不会运行它，且它不能证明生产延迟、费用或模型行为。
 - 幂等存储仅限当前进程，不提供崩溃恢复或分布式 exactly-once 语义。
 - 应用必须在执行敏感 handler 前增加授权和人工审批。
 
@@ -90,6 +102,11 @@ mvn "-P!jdk-17" exec:java
 - [文档索引](docs/README.zh-CN.md)
 - [架构、类职责与调用链路](docs/architecture.zh-CN.md)
 - [可持续迭代项目思维导图](docs/project-mind-map.zh-CN.md)
+- [配置说明](docs/configuration.zh-CN.md)
+- [运维说明](docs/operations.zh-CN.md)
+- [故障排查](docs/troubleshooting.zh-CN.md)
+- [测试说明](docs/testing.zh-CN.md)
+- [发布验收](docs/release-verification.zh-CN.md)
 - [ADR-0001：Runtime 与包边界](docs/adr/0001-runtime-and-package-boundaries.zh-CN.md)
 - [ADR-0002：Responses 协议账本与调用批次](docs/adr/0002-responses-protocol-ledger.zh-CN.md)
 - [ADR-0003：工具契约与执行权限](docs/adr/0003-tool-contract-and-authority.zh-CN.md)
@@ -97,6 +114,8 @@ mvn "-P!jdk-17" exec:java
 - [ADR-0005：响应终态与解码边界](docs/adr/0005-response-terminal-and-decoding.zh-CN.md)
 - [ADR-0006：离线验证边界](docs/adr/0006-offline-verification-boundary.zh-CN.md)
 - [ADR-0007：有状态 Responses 续接](docs/adr/0007-stateful-responses-continuation.zh-CN.md)
+- [ADR-0008：全局运行预算](docs/adr/0008-global-run-budget.zh-CN.md)
+- [ADR-0009：配置档隔离与职责拆分](docs/adr/0009-profile-isolation-and-responsibility-split.zh-CN.md)
 
 ## 官方参考资料
 
@@ -105,3 +124,4 @@ mvn "-P!jdk-17" exec:java
 - [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
 - [OpenAI Error codes](https://developers.openai.com/api/docs/guides/error-codes)
 - [OpenAI Rate limits](https://developers.openai.com/api/docs/guides/rate-limits)
+- [OpenAI Production best practices](https://developers.openai.com/api/docs/guides/production-best-practices)

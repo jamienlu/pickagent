@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class IdempotentExecutorTest {
+    // 场景：相同业务键与请求重放首个结果且副作用仅执行一次；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void sameKeyAndSameRequestReturnsFirstResultAndExecutesSideEffectOnce() throws Exception {
         IdempotentExecutor<String> executor = executor();
@@ -24,6 +25,7 @@ class IdempotentExecutorTest {
         assertEquals(1, sideEffects.get());
     }
 
+    // 场景：同一业务键对应不同请求时在第二次副作用前拒绝；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void sameKeyAndDifferentRequestIsRejectedBeforeSecondSideEffect() throws Exception {
         IdempotentExecutor<String> executor = executor();
@@ -40,6 +42,7 @@ class IdempotentExecutorTest {
         assertEquals(1, sideEffects.get());
     }
 
+    // 场景：不同业务键各自独立执行一次；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void differentKeysEachExecuteOnce() throws Exception {
         IdempotentExecutor<String> executor = executor();
@@ -53,6 +56,7 @@ class IdempotentExecutorTest {
         assertEquals(2, sideEffects.get());
     }
 
+    // 场景：失败结果不缓存且同一操作可以再次尝试；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void failedResultIsNotCachedAndTheSameOperationMayBeAttemptedAgain() throws Exception {
         IdempotentExecutor<String> executor = executor();
@@ -72,6 +76,7 @@ class IdempotentExecutorTest {
         assertEquals(2, attempts.get());
     }
 
+    // 场景：稳定业务键阻止网络重试或消息重放重复已提交副作用；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void networkRetryOrMessageReplayWithStableOperationKeyCannotRepeatCommittedEffect()
             throws Exception {
@@ -87,6 +92,23 @@ class IdempotentExecutorTest {
         assertEquals(100, acknowledged);
         assertEquals(100, replayAcknowledged);
         assertEquals(100, chargedAmount.get());
+    }
+
+    // 场景：幂等执行器收到空或空白键以及空操作；行为：执行参数校验；预期：在访问存储前全部拒绝。
+    @Test
+    void rejectsInvalidExecutionArguments() {
+        IdempotentExecutor<String> executor = executor();
+
+        assertThrows(IllegalArgumentException.class,
+                () -> executor.execute(null, "fingerprint", () -> "result"));
+        assertThrows(IllegalArgumentException.class,
+                () -> executor.execute(" ", "fingerprint", () -> "result"));
+        assertThrows(IllegalArgumentException.class,
+                () -> executor.execute("key", null, () -> "result"));
+        assertThrows(IllegalArgumentException.class,
+                () -> executor.execute("key", " ", () -> "result"));
+        assertThrows(NullPointerException.class,
+                () -> executor.execute("key", "fingerprint", null));
     }
 
     private static IdempotentExecutor<String> executor() {

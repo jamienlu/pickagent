@@ -19,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
 class OpenAiFunctionCallMapperTest {
     private final OpenAiFunctionCallMapper mapper = new OpenAiFunctionCallMapper();
 
+    // 场景：函数调用映射标识、名称和字符串参数且不执行工具；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void mapsCallIdNameAndStringArgumentsWithoutExecutingATool() {
         AgentDecision.ToolCall mapped = mapper.map(List.of(call(
@@ -29,6 +30,7 @@ class OpenAiFunctionCallMapperTest {
         assertEquals(Map.of("orderId", "ORD-001"), mapped.arguments());
     }
 
+    // 场景：单个函数调用前允许存在推理条目；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void reasoningItemMayPrecedeTheSingleFunctionCall() {
         ResponseReasoningItem reasoning = ResponseReasoningItem.builder()
@@ -43,6 +45,7 @@ class OpenAiFunctionCallMapperTest {
         assertEquals("call_after_reasoning", mapped.callId());
     }
 
+    // 场景：畸形参数 JSON 以明确分类失败；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void malformedArgumentsJsonFailsExplicitly() {
         var failure = assertThrows(OpenAiFunctionCallMappingException.class,
@@ -53,6 +56,7 @@ class OpenAiFunctionCallMapperTest {
         assertNotNull(failure.getCause());
     }
 
+    // 场景：数组参数根节点被明确拒绝；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void arrayArgumentsRootFailsExplicitly() {
         assertFailure("[\"ORD-001\"]",
@@ -60,6 +64,7 @@ class OpenAiFunctionCallMapperTest {
                 "function_call arguments root must be a JSON object");
     }
 
+    // 场景：非字符串参数值被明确拒绝；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void nonStringArgumentValueFailsExplicitly() {
         assertFailure("{\"orderId\":123}",
@@ -67,6 +72,7 @@ class OpenAiFunctionCallMapperTest {
                 "function_call argument 'orderId' must be a string");
     }
 
+    // 场景：多个函数调用不会被静默选取其中一个；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void multipleFunctionCallsFailBeforeEitherCanBeSilentlySelected() {
         var failure = assertThrows(OpenAiFunctionCallMappingException.class, () -> mapper.map(List.of(
@@ -77,6 +83,7 @@ class OpenAiFunctionCallMapperTest {
         assertEquals("expected exactly one function_call but found 2", failure.getMessage());
     }
 
+    // 场景：批量函数调用按响应顺序映射；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void mapsMultipleFunctionCallsInResponseOrder() {
         List<AgentDecision.ToolCall> calls = mapper.mapAll(List.of(
@@ -89,6 +96,7 @@ class OpenAiFunctionCallMapperTest {
                 () -> calls.add(calls.getFirst()));
     }
 
+    // 场景：批次重复调用标识以明确分类失败；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void duplicateCallIdInBatchFailsExplicitly() {
         var failure = assertThrows(OpenAiFunctionCallMappingException.class,
@@ -100,6 +108,7 @@ class OpenAiFunctionCallMapperTest {
                 failure.reason());
     }
 
+    // 场景：第二个调用格式错误时拒绝整个批次；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void malformedSecondCallRejectsTheWholeBatch() {
         var failure = assertThrows(OpenAiFunctionCallMappingException.class,
@@ -111,6 +120,7 @@ class OpenAiFunctionCallMapperTest {
                 failure.reason());
     }
 
+    // 场景：没有函数调用的输出以明确分类失败；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void outputWithoutAFunctionCallFailsExplicitly() {
         ResponseReasoningItem reasoning = ResponseReasoningItem.builder()
@@ -123,6 +133,43 @@ class OpenAiFunctionCallMapperTest {
 
         assertEquals(OpenAiFunctionCallMappingException.Reason.NO_FUNCTION_CALL, failure.reason());
         assertEquals("expected at least one function_call but found 0", failure.getMessage());
+    }
+
+    // 场景：函数调用标识为空白；行为：映射 SDK 调用；预期：以稳定字段错误分类拒绝。
+    @Test
+    void blankCallIdFailsExplicitly() {
+        var failure = assertThrows(OpenAiFunctionCallMappingException.class,
+                () -> mapper.map(List.of(call(" ", "lookup_order", "{}"))));
+
+        assertEquals(OpenAiFunctionCallMappingException.Reason.INVALID_FUNCTION_CALL_FIELD,
+                failure.reason());
+    }
+
+    // 场景：函数名称为空白；行为：映射 SDK 调用；预期：以稳定字段错误分类拒绝。
+    @Test
+    void blankFunctionNameFailsExplicitly() {
+        var failure = assertThrows(OpenAiFunctionCallMappingException.class,
+                () -> mapper.map(List.of(call("call-1", " ", "{}"))));
+
+        assertEquals(OpenAiFunctionCallMappingException.Reason.INVALID_FUNCTION_CALL_FIELD,
+                failure.reason());
+    }
+
+    // 场景：函数参数 JSON 为空白；行为：解析参数；预期：走无底层解析异常的格式错误分支。
+    @Test
+    void blankArgumentsJsonFailsExplicitly() {
+        var failure = assertThrows(OpenAiFunctionCallMappingException.class,
+                () -> mapper.map(List.of(call("call-1", "lookup_order", " "))));
+
+        assertEquals(OpenAiFunctionCallMappingException.Reason.MALFORMED_ARGUMENTS_JSON,
+                failure.reason());
+        assertEquals(null, failure.getCause());
+    }
+
+    // 场景：映射入口收到空列表引用；行为：执行映射；预期：立即拒绝空输入。
+    @Test
+    void rejectsNullOutputList() {
+        assertThrows(NullPointerException.class, () -> mapper.mapAll(null));
     }
 
     private void assertFailure(String arguments,

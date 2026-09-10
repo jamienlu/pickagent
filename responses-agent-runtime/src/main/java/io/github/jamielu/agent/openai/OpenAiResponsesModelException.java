@@ -2,16 +2,16 @@ package io.github.jamielu.agent.openai;
 
 import java.util.Objects;
 
-/** A typed failure in the stateful Responses model adapter contract. */
+/** 有状态 Responses 模型适配器契约中的类型化失败。 */
 public final class OpenAiResponsesModelException extends IllegalStateException {
-    /** Stable category that callers can branch on without parsing the message. */
+    /** 无需解析消息即可分支处理的稳定分类。 */
     private final Reason reason;
 
     /**
-     * Creates an adapter failure.
+     * 创建适配器失败。
      *
-     * @param reason stable machine-readable category
-     * @param message diagnostic detail
+     * @param reason 稳定失败分类
+     * @param message 不包含秘密的诊断消息
      */
     public OpenAiResponsesModelException(Reason reason, String message) {
         super(message);
@@ -19,23 +19,23 @@ public final class OpenAiResponsesModelException extends IllegalStateException {
     }
 
     /**
-     * Returns the stable failure category.
+     * 返回稳定失败分类。
      *
-     * @return machine-readable adapter failure reason
+     * @return 稳定失败分类
      */
     public Reason reason() {
         return reason;
     }
 
-    /** Adapter failures that callers can handle without parsing messages. */
+    /** 调用方无需解析消息即可处理的适配器失败。 */
     public enum Reason {
-        /** A continuation context does not match the adapter's pending call. */
+        /** 续接上下文与适配器待处理调用不匹配。 */
         CONTEXT_MISMATCH,
-        /** The provider returned a blank response identifier. */
+        /** 供应商返回空白响应标识。 */
         INVALID_RESPONSE_ID,
-        /** A terminal response did not contain visible output text. */
+        /** 终态响应没有可见输出文本。 */
         MISSING_FINAL_TEXT,
-        /** A terminal response included an unsupported output item. */
+        /** 终态响应包含不支持的输出条目。 */
         UNEXPECTED_FINAL_OUTPUT_ITEM
     }
 }

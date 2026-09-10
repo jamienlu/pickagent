@@ -1,5 +1,6 @@
 package io.github.jamielu.agent.openai;
 
+import com.openai.client.OpenAIClient;
 import com.openai.core.JsonValue;
 import com.openai.models.responses.Response;
 import com.openai.models.responses.ResponseCreateParams;
@@ -15,9 +16,11 @@ import io.github.jamielu.agent.api.AgentDecision;
 import io.github.jamielu.agent.api.ToolResult;
 import io.github.jamielu.agent.example.support.ReplayOrderTool;
 import io.github.jamielu.agent.runtime.AgentRuntime;
+import io.github.jamielu.agent.runtime.AgentModelPort;
 import io.github.jamielu.agent.tool.ToolRegistry;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Proxy;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,6 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class OpenAiResponsesModelTest {
+    // 场景：首轮请求包含完整模型、指令、工具和安全配置；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void initialRequestContainsCompleteStatelessConfiguration() {
         RecordingTransport transport = new RecordingTransport(toolResponse("resp_tool", "call_001"));
@@ -54,6 +58,7 @@ class OpenAiResponsesModelTest {
                 params.tools().orElseThrow().getFirst().asFunction().name());
     }
 
+    // 场景：续接请求使用上一响应标识及匹配的函数输出；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void continuationUsesPreviousResponseIdAndMatchingFunctionOutput() {
         RecordingTransport transport = new RecordingTransport(
@@ -87,6 +92,7 @@ class OpenAiResponsesModelTest {
                 items.getFirst().asFunctionCallOutput().output().asString());
     }
 
+    // 场景：运行时执行 SDK 工具调用后续接到最终回答；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void runtimeExecutesSdkToolCallAndContinuesToFinalAnswer() {
         RecordingTransport transport = new RecordingTransport(
@@ -114,6 +120,7 @@ class OpenAiResponsesModelTest {
                         .getFirst().asFunctionCallOutput().output().asString());
     }
 
+    // 场景：运行时可跨多个已存储响应连续处理工具调用；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void runtimeCanContinueAcrossMultipleStoredResponses() {
         RecordingTransport transport = new RecordingTransport(
@@ -137,6 +144,7 @@ class OpenAiResponsesModelTest {
         assertContinuation(transport.requests().get(2), "resp_2", "call_2", "execution-2");
     }
 
+    // 场景：核心单调用适配器面对多个函数调用时失败关闭；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void multipleFunctionCallsFailClosed() {
         Response response = response("resp_multi", List.of(
@@ -148,6 +156,7 @@ class OpenAiResponsesModelTest {
                 () -> model.decide(initialContext("Find orders")));
     }
 
+    // 场景：不支持的工具输出在运行时产生副作用前失败关闭；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void unsupportedToolOutputFailsClosedBeforeRuntimeCanExecute() {
         Response response = response("resp_unknown", List.of(
@@ -159,6 +168,7 @@ class OpenAiResponsesModelTest {
                 () -> model.decide(initialContext("Find ORD-001")));
     }
 
+    // 场景：供应商返回空白响应标识时失败关闭；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void blankResponseIdFailsClosed() {
         var model = new OpenAiResponsesModel(
@@ -172,6 +182,7 @@ class OpenAiResponsesModelTest {
         assertEquals(OpenAiResponsesModelException.Reason.INVALID_RESPONSE_ID, failure.reason());
     }
 
+    // 场景：终态响应没有可见文本时失败关闭；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void terminalResponseWithoutTextFailsClosed() {
         var model = new OpenAiResponsesModel(
@@ -186,6 +197,7 @@ class OpenAiResponsesModelTest {
         assertEquals(OpenAiResponsesModelException.Reason.MISSING_FINAL_TEXT, failure.reason());
     }
 
+    // 场景：终态包含未知条目时即使有文本也失败关闭；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void unsupportedTerminalOutputItemFailsClosedEvenWhenTextExists() {
         var model = new OpenAiResponsesModel(
@@ -202,6 +214,7 @@ class OpenAiResponsesModelTest {
                 failure.reason());
     }
 
+    // 场景：续接输入变化时在传输调用前拒绝；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void changedContinuationContextFailsBeforeTransportCall() {
         RecordingTransport transport = new RecordingTransport(toolResponse("resp_tool", "call_001"));
@@ -219,6 +232,164 @@ class OpenAiResponsesModelTest {
 
         assertEquals(OpenAiResponsesModelException.Reason.CONTEXT_MISMATCH, failure.reason());
         assertEquals(1, transport.requests().size());
+    }
+
+    // 场景：配置自定义输出与存储选项；行为：构建首轮请求；预期：上限和 store 值显式写入。
+    @Test
+    void requestUsesExplicitResponseOptions() {
+        RecordingTransport transport = new RecordingTransport(
+                finalResponse("resp-final", "done"));
+        var model = new OpenAiResponsesModel(
+                transport, "gpt-test", Optional.empty(),
+                new OpenAiResponseOptions(77, false));
+
+        model.decide(initialContext("question"));
+
+        ResponseCreateParams params = transport.requests().getFirst();
+        assertEquals(77, params.maxOutputTokens().orElseThrow());
+        assertFalse(params.store().orElseThrow());
+    }
+
+    // 场景：通过 SDK 客户端各构造器装配适配器；行为：仅创建实例；预期：不会提前发起网络请求。
+    @Test
+    void sdkClientConstructorsOnlyConfigureTransport() {
+        OpenAIClient client = unusedClient();
+
+        assertTrue(new OpenAiResponsesModel(client, "gpt-test") instanceof AgentModelPort);
+        assertTrue(new OpenAiResponsesModel(
+                client, "gpt-test", Optional.of("instruction")) instanceof AgentModelPort);
+        assertTrue(new OpenAiResponsesModel(
+                client, "gpt-test", Optional.empty(),
+                new OpenAiResponseOptions(10, true)) instanceof AgentModelPort);
+    }
+
+    // 场景：模型适配器构造参数为空或空白；行为：执行边界校验；预期：所有非法依赖都被拒绝。
+    @Test
+    void constructorRejectsInvalidDependenciesAndText() {
+        OpenAiResponsesTransport transport = params -> finalResponse("resp", "done");
+
+        assertThrows(NullPointerException.class,
+                () -> new OpenAiResponsesModel((OpenAiResponsesTransport) null, "model"));
+        assertThrows(IllegalArgumentException.class,
+                () -> new OpenAiResponsesModel(transport, null));
+        assertThrows(IllegalArgumentException.class,
+                () -> new OpenAiResponsesModel(transport, " "));
+        assertThrows(NullPointerException.class,
+                () -> new OpenAiResponsesModel(transport, "model", null));
+        assertThrows(IllegalArgumentException.class,
+                () -> new OpenAiResponsesModel(
+                        transport, "model", Optional.of(" ")));
+        assertThrows(NullPointerException.class,
+                () -> new OpenAiResponsesModel(
+                        transport, "model", Optional.empty(), null));
+    }
+
+    // 场景：模型调用上下文为空或传输返回空响应；行为：执行一次决策；预期：在状态更新前快速失败。
+    @Test
+    void decideRejectsNullContextAndNullTransportResponse() {
+        var model = new OpenAiResponsesModel(params -> null, "gpt-test");
+
+        assertThrows(NullPointerException.class, () -> model.decide(null));
+        assertThrows(NullPointerException.class,
+                () -> model.decide(initialContext("question")));
+    }
+
+    // 场景：首次调用错误地携带历史；行为：尝试发送续接；预期：因没有待处理函数调用而拒绝且不访问传输。
+    @Test
+    void continuationBeforeInitialDecisionFails() {
+        RecordingTransport transport = new RecordingTransport();
+        var model = new OpenAiResponsesModel(transport, "gpt-test");
+        AgentDecision.ToolCall call = toolCall("call");
+
+        OpenAiResponsesModelException failure = assertThrows(
+                OpenAiResponsesModelException.class,
+                () -> model.decide(contextWithExchange("question", call)));
+
+        assertEquals(OpenAiResponsesModelException.Reason.CONTEXT_MISMATCH, failure.reason());
+        assertTrue(transport.requests().isEmpty());
+    }
+
+    // 场景：最终回答后错误地继续携带工具历史；行为：尝试续接；预期：pending call 为空分支拒绝请求。
+    @Test
+    void continuationAfterFinalAnswerFails() {
+        RecordingTransport transport = new RecordingTransport(
+                finalResponse("resp-final", "done"));
+        var model = new OpenAiResponsesModel(transport, "gpt-test");
+        model.decide(initialContext("question"));
+
+        assertThrows(OpenAiResponsesModelException.class,
+                () -> model.decide(contextWithExchange("question", toolCall("call"))));
+        assertEquals(1, transport.requests().size());
+    }
+
+    // 场景：续接时工具定义被更换；行为：验证运行内上下文；预期：不发送第二次请求。
+    @Test
+    void changedToolsFailContinuation() {
+        RecordingTransport transport = new RecordingTransport(
+                toolResponse("resp-tool", "call_001"));
+        var model = new OpenAiResponsesModel(transport, "gpt-test");
+        AgentContext first = initialContext("question");
+        AgentDecision.ToolCall call = assertInstanceOf(
+                AgentDecision.ToolCall.class, model.decide(first));
+
+        assertThrows(OpenAiResponsesModelException.class,
+                () -> model.decide(new AgentContext(
+                        first.input(),
+                        List.of(new AgentContext.Exchange(
+                                call, new ToolResult(call.callId(), "result"))),
+                        List.of())));
+        assertEquals(1, transport.requests().size());
+    }
+
+    // 场景：续接历史一次增加两个结果；行为：验证历史增量；预期：拒绝非单步推进。
+    @Test
+    void multipleNewHistoryEntriesFailContinuation() {
+        RecordingTransport transport = new RecordingTransport(
+                toolResponse("resp-tool", "call_001"));
+        var model = new OpenAiResponsesModel(transport, "gpt-test");
+        AgentContext first = initialContext("question");
+        AgentDecision.ToolCall call = assertInstanceOf(
+                AgentDecision.ToolCall.class, model.decide(first));
+        AgentDecision.ToolCall extra = toolCall("call-extra");
+
+        assertThrows(OpenAiResponsesModelException.class,
+                () -> model.decide(new AgentContext(
+                        first.input(),
+                        List.of(
+                                new AgentContext.Exchange(call,
+                                        new ToolResult(call.callId(), "result")),
+                                new AgentContext.Exchange(extra,
+                                        new ToolResult(extra.callId(), "result"))),
+                        first.tools())));
+        assertEquals(1, transport.requests().size());
+    }
+
+    // 场景：续接历史的调用标识与待处理调用不同；行为：验证关联；预期：拒绝错配并保留第一轮状态。
+    @Test
+    void mismatchedPendingCallIdFailsContinuation() {
+        RecordingTransport transport = new RecordingTransport(
+                toolResponse("resp-tool", "call_001"));
+        var model = new OpenAiResponsesModel(transport, "gpt-test");
+        AgentContext first = initialContext("question");
+        model.decide(first);
+        AgentDecision.ToolCall wrong = toolCall("call-wrong");
+
+        assertThrows(OpenAiResponsesModelException.class,
+                () -> model.decide(contextWithExchange(first.input(), wrong)));
+        assertEquals(1, transport.requests().size());
+    }
+
+    private static AgentDecision.ToolCall toolCall(String callId) {
+        return new AgentDecision.ToolCall(
+                callId, "lookup_order", java.util.Map.of("orderId", "ORD-001"));
+    }
+
+    private static AgentContext contextWithExchange(
+            String input, AgentDecision.ToolCall call) {
+        return new AgentContext(input,
+                List.of(new AgentContext.Exchange(
+                        call, new ToolResult(call.callId(), "result"))),
+                List.of(ReplayOrderTool.DEFINITION));
     }
 
     private static AgentContext initialContext(String input) {
@@ -299,6 +470,16 @@ class OpenAiResponsesModelTest {
                 .queries(List.of("order"))
                 .status(ResponseFileSearchToolCall.Status.COMPLETED)
                 .build();
+    }
+
+    private static OpenAIClient unusedClient() {
+        return (OpenAIClient) Proxy.newProxyInstance(
+                OpenAIClient.class.getClassLoader(),
+                new Class<?>[]{OpenAIClient.class},
+                (proxy, method, args) -> {
+                    throw new AssertionError(
+                            "constructor must not call SDK client: " + method.getName());
+                });
     }
 
     private static final class RecordingTransport implements OpenAiResponsesTransport {

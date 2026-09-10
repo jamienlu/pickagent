@@ -9,6 +9,9 @@ This document is the current structural map of the codebase. ADRs explain why du
 ```mermaid
 flowchart LR
     User[Caller or application] --> Runtime[AgentRuntime]
+    Online[OpenAiOnlineRunner] --> Runtime
+    Config[OpenAiOnlineConfig] --> Online
+    Client[OpenAiClientFactory] --> Online
     Runtime --> Port[AgentModelPort]
     ModelAdapter[OpenAiResponsesModel] -. implements .-> Port
     ModelAdapter --> Transport[OpenAiResponsesTransport]
@@ -33,7 +36,8 @@ The blocking SDK transport path is implemented. Default tests replace the networ
 
 ```mermaid
 flowchart TB
-    example[example<br/>offline composition and fixtures]
+    offline[offline profile<br/>deterministic demo]
+    online[online<br/>configuration and composition]
     openai[openai<br/>Responses SDK adapter]
     runtime[runtime<br/>agent loop]
     tool[tool<br/>validation and dispatch]
@@ -43,10 +47,13 @@ flowchart TB
     sdk[OpenAI Java SDK]
     json[fastjson2]
 
-    example --> runtime
-    example --> openai
-    example --> tool
-    example --> api
+    offline --> runtime
+    offline --> tool
+    offline --> api
+    online --> runtime
+    online --> openai
+    online --> tool
+    online --> sdk
     openai --> api
     openai --> tool
     openai --> sdk
@@ -68,9 +75,24 @@ classDiagram
     class AgentRuntime {
       -Supplier~AgentModelPort~ modelFactory
       -ToolRegistry tools
-      -int maxSteps
-      +withModelFactory(modelFactory, tools, maxSteps) AgentRuntime
+      -RunBudget budget
+      -NanoClock clock
+      +withModelFactory(modelFactory, tools, budget, clock) AgentRuntime
       +run(String input) Result
+    }
+    class RunBudget {
+      +int maxModelCalls
+      +int maxToolCalls
+      +Duration maxDuration
+    }
+    class RunUsage {
+      +int modelCalls
+      +int toolCalls
+      +Duration elapsed
+    }
+    class NanoClock {
+      <<interface>>
+      +nanoTime() long
     }
     class AgentModelPort {
       <<interface>>
@@ -114,6 +136,9 @@ classDiagram
 
     AgentRuntime --> AgentModelPort : requests decisions
     AgentRuntime --> ToolRegistry : validates and executes
+    AgentRuntime --> RunBudget : enforces
+    AgentRuntime --> NanoClock : measures deadline
+    AgentRuntime ..> RunUsage : snapshots every terminal
     AgentRuntime --> AgentStep : records
     AgentRuntime --> AgentState : traces
     AgentModelPort ..> AgentContext
@@ -141,6 +166,10 @@ classDiagram
 | [`ToolResult`](../src/main/java/io/github/jamielu/agent/api/ToolResult.java) | Tool output correlated by the original `callId`. | Stored in history; mapped to `function_call_output`. |
 | [`AgentModelPort`](../src/main/java/io/github/jamielu/agent/runtime/AgentModelPort.java) | Boundary for one model decision. | Implemented by `OpenAiResponsesModel` and fixture adapters. |
 | [`AgentRuntime`](../src/main/java/io/github/jamielu/agent/runtime/AgentRuntime.java) | Drives the bounded model-tool-model loop and returns typed terminal results. | Obtains one `AgentModelPort` from its factory per run and uses `ToolRegistry`. |
+| [`RunBudget`](../src/main/java/io/github/jamielu/agent/runtime/RunBudget.java) | Immutable cross-turn limits for model calls, tool calls, and monotonic duration. | Enforced by `AgentRuntime` before requests and side effects. |
+| [`RunUsage`](../src/main/java/io/github/jamielu/agent/runtime/RunUsage.java) | Immutable model-call, tool-call, and elapsed-time snapshot. | Included by every Runtime terminal result. |
+| [`NanoClock`](../src/main/java/io/github/jamielu/agent/runtime/NanoClock.java) | Monotonic time port. | System implementation in production; deterministic fake in tests. |
+| [`ModelExecutionException`](../src/main/java/io/github/jamielu/agent/runtime/ModelExecutionException.java) | Provider-neutral typed model failure. | Carries `FailureKind`; converted to `AgentRuntime.ModelFailed`. |
 | [`ToolRegistry`](../src/main/java/io/github/jamielu/agent/tool/ToolRegistry.java) | Allowlist, exact argument validation, side-effect-free batch preflight, dispatch, and call/result correlation. | Owns `Registration` and `PreparedCall`; invokes `ToolHandler`. |
 | [`ToolHandler`](../src/main/java/io/github/jamielu/agent/tool/ToolHandler.java) | Executes already-validated application logic. | Registered in `ToolRegistry`. |
 | [`ToolExecutionException`](../src/main/java/io/github/jamielu/agent/tool/ToolExecutionException.java) | Typed expected handler failure. | Converted to `AgentRuntime.ToolFailed`. |
@@ -153,10 +182,23 @@ classDiagram
       +run(firstOutput, secondTurn, registry) ReplayResult
     }
     class OpenAiResponsesModel {
-      -String previousResponseId
-      -String pendingCallId
+      -OpenAiConversation conversation
+      -OpenAiResponseDecoder decoder
       +decide(AgentContext) AgentDecision
     }
+    class OpenAiConversation {
+      -String previousResponseId
+      -String pendingCallId
+      +createRequest(AgentContext) ResponseCreateParams
+      +accept(Response, AgentDecision)
+    }
+    class OpenAiResponseDecoder {
+      +decode(Response) AgentDecision
+    }
+    class OpenAiExceptionMapper {
+      +map(OpenAIException) ModelExecutionException
+    }
+    class OpenAiResponseOptions
     class OpenAiResponsesTransport {
       <<interface>>
       +create(ResponseCreateParams) Response
@@ -190,6 +232,10 @@ classDiagram
 
     AgentModelPort <|.. OpenAiResponsesModel
     OpenAiResponsesModel --> OpenAiResponsesTransport
+    OpenAiResponsesModel --> OpenAiConversation
+    OpenAiResponsesModel --> OpenAiResponseDecoder
+    OpenAiResponsesModel --> OpenAiExceptionMapper
+    OpenAiConversation --> OpenAiResponseOptions
     OpenAiResponsesModel --> OpenAiFunctionToolMapper
     OpenAiResponsesModel --> OpenAiFunctionCallMapper
     OpenAiResponsesModel --> OpenAiFunctionCallOutputMapper
@@ -220,8 +266,22 @@ classDiagram
 | [`OpenAiResponseLedgerException`](../src/main/java/io/github/jamielu/agent/openai/OpenAiResponseLedgerException.java) | Stable fail-closed protocol errors. | Prevents unsafe continuation. |
 | [`OpenAiResponseReplay`](../src/main/java/io/github/jamielu/agent/openai/OpenAiResponseReplay.java) | Orchestrates one offline tool batch and one required final continuation. | Composes ledger, call mapper, and registry. |
 | [`OpenAiResponsesTransport`](../src/main/java/io/github/jamielu/agent/openai/OpenAiResponsesTransport.java) | Minimal blocking Responses create boundary with an `OpenAIClient` bridge. | Injected into the live model adapter and replaced by captures in offline tests. |
-| [`OpenAiResponsesModel`](../src/main/java/io/github/jamielu/agent/openai/OpenAiResponsesModel.java) | Stateful per-run `AgentModelPort` using `previous_response_id`; repeats configuration and disables parallel calls. | Builds SDK requests through the transport and maps responses to core decisions. |
+| [`OpenAiResponsesModel`](../src/main/java/io/github/jamielu/agent/openai/OpenAiResponsesModel.java) | Coordinates one provider decision and owns one conversation per run. | Composes transport, conversation, decoder, and exception mapper. |
+| [`OpenAiConversation`](../src/main/java/io/github/jamielu/agent/openai/OpenAiConversation.java) | Owns continuation state and builds first/continuation SDK requests. | Repeats model, instructions, tools, and response options. |
+| [`OpenAiResponseDecoder`](../src/main/java/io/github/jamielu/agent/openai/OpenAiResponseDecoder.java) | Decodes heterogeneous SDK output into one provider-neutral decision. | Fails closed on ambiguous or unsupported terminal output. |
+| [`OpenAiResponseOptions`](../src/main/java/io/github/jamielu/agent/openai/OpenAiResponseOptions.java) | Immutable per-response output-token and storage options. | Applied by `OpenAiConversation`. |
+| [`OpenAiExceptionMapper`](../src/main/java/io/github/jamielu/agent/openai/OpenAiExceptionMapper.java) | Maps SDK failures to stable `FailureKind` values without exposing credentials. | Produces `ModelExecutionException`. |
 | [`OpenAiResponsesModelException`](../src/main/java/io/github/jamielu/agent/openai/OpenAiResponsesModelException.java) | Stable failures for invalid IDs, terminal output, and continuation context. | Raised before unsafe continuation or accepting an invalid final answer. |
+
+### Online composition class catalog
+
+| Class | Function | Important relationships |
+| --- | --- | --- |
+| [`OpenAiOnlineConfig`](../src/main/java/io/github/jamielu/agent/online/OpenAiOnlineConfig.java) | Validates environment-backed secrets, request settings, and global budgets. | Supplies client, model, response, and Runtime configuration. |
+| [`OpenAiClientFactory`](../src/main/java/io/github/jamielu/agent/online/OpenAiClientFactory.java) | Creates the SDK client with timeout, base URL, and the single retry owner. | Consumes `OpenAiOnlineConfig`. |
+| [`OpenAiOnlineRunner`](../src/main/java/io/github/jamielu/agent/online/OpenAiOnlineRunner.java) | Opens, composes, runs, and closes one online model session. | Creates `AgentRuntime` and guarantees SDK resource closure. |
+| `OpenAiAgentCli` (`online` profile) | Explicit command-line entry point with stable exit behavior. | Delegates to `OpenAiOnlineRunner`; not part of the default source set. |
+| `OpenAiLiveSmokeIT` (`live` profile) | Minimal credentialed endpoint compatibility check. | Skips without explicit key and model; never part of the default test suite. |
 
 ## Reliability classes
 
@@ -277,13 +337,15 @@ sequenceDiagram
     participant H as ToolHandler
 
     Caller->>R: run(input)
-    loop until final answer or maxSteps
+    loop until final answer, failure, or global budget stop
+        R->>R: check deadline and model-call budget
         R->>M: decide(AgentContext)
         alt FinalAnswer
             M-->>R: FinalAnswer
             R-->>Caller: Completed
         else ToolCall and another model step remains
             M-->>R: ToolCall
+            R->>R: check deadline, model-call, tool-call, duplicate ID
             R->>T: execute(call)
             T->>T: prepare(call)
             T->>H: execute(validated arguments)
@@ -362,9 +424,11 @@ No handler can run before protocol validation, mapping, and complete batch prefl
 | Change | Primary code | Required documentation and tests |
 | --- | --- | --- |
 | Add an API value or decision type | `api`, then `runtime` consumers | Core class diagram, class catalog, runtime tests, and a new ADR if the abstraction changes. |
+| Change a global budget or terminal result | `runtime` | Runtime diagram, ADR-0008 successor, boundary tests, operations metrics, and both READMEs. |
 | Add a provider | New adapter package | Package graph, adapter diagram, contract tests; keep core packages provider-neutral. |
 | Add a tool argument type | `ToolDefinition`, registry validation, provider mappers | Tool ADR, schema tests, invalid-input tests, and both READMEs. |
 | Evolve the live OpenAI transport | `OpenAiResponsesTransport` and `OpenAiResponsesModel` | Stateful sequence, ADR-0007, retry/error-classification tests, credential and cost guidance. |
+| Change online configuration or profile ownership | `online`, `pom.xml`, profile source sets | Configuration, operations, release verification, and ADR-0009 successor. |
 | Add parallel tool execution | New execution policy around `PreparedCall` | Ordering/failure ADR, sequence diagram, race and partial-failure tests. |
 | Add durable idempotency | `IdempotencyStore` implementation | Deployment architecture, transaction semantics ADR, crash/concurrency tests. |
 | Add streaming or structured final output | OpenAI transport/decoder layer | ADR-0005 successor or extension, terminal-state diagrams, incomplete/refusal tests. |

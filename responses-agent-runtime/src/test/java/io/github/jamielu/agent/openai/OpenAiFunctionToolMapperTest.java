@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class OpenAiFunctionToolMapperTest {
     private final OpenAiFunctionToolMapper mapper = new OpenAiFunctionToolMapper();
 
+    // 场景：工具映射保留名称说明并启用严格模式；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void mapsNameDescriptionAndEnablesStrictMode() {
         FunctionTool tool = mapper.map(definition());
@@ -25,6 +26,7 @@ class OpenAiFunctionToolMapperTest {
         assertTrue(tool.strict().orElseThrow());
     }
 
+    // 场景：工具 Schema 根对象关闭额外属性；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void buildsClosedObjectAtTheSchemaRoot() {
         Map<String, Object> schema = schema(mapper.map(definition()));
@@ -33,6 +35,7 @@ class OpenAiFunctionToolMapperTest {
         assertEquals(false, schema.get("additionalProperties"));
     }
 
+    // 场景：每个核心参数映射为字符串属性；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void mapsEveryParameterAsAStringProperty() {
         Map<String, Object> properties = objectMap(schema(mapper.map(definition())).get("properties"));
@@ -44,6 +47,7 @@ class OpenAiFunctionToolMapperTest {
         assertFalse(objectMap(properties.get("query")).containsKey("items"));
     }
 
+    // 场景：全部属性按声明顺序进入必填列表；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void putsAllPropertiesInRequiredUsingDeclaredOrder() {
         Map<String, Object> schema = schema(mapper.map(definition()));
@@ -51,6 +55,7 @@ class OpenAiFunctionToolMapperTest {
         assertEquals(List.of("tenant", "query"), schema.get("required"));
     }
 
+    // 场景：兼容集合构造器产生稳定必填顺序；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void compatibleSetConstructorProducesStableRequiredOrder() {
         var legacy = new ToolDefinition("search_records", "Search tenant records", Set.of("tenant", "query"));

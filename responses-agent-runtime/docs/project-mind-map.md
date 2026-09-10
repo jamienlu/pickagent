@@ -20,7 +20,11 @@ mindmap
         Per-run model factory
         Typed terminal results
         Duplicate call protection
-        Step budget
+        Global run budget
+          Model call ceiling
+          Tool call ceiling
+          Monotonic deadline
+        Immutable usage on every terminal
     Tool boundary
       Allowlisted registry
       Exact argument validation
@@ -36,9 +40,19 @@ mindmap
       Offline two-turn replay
       Blocking SDK transport bridge
       Stateful previous_response_id continuation
+      Split conversation and response decoder
+      Typed SDK failure mapping
       Repeated instructions and tools
+      Per-response output token ceiling
       store enabled
       Parallel tool calls disabled
+    Online and offline separation
+      Default build has no request path
+      Offline deterministic proof
+      Online explicit CLI
+      Live opt-in smoke
+      External validated configuration
+      Per-run client lifecycle
     Reliability policy
       Failure classification
       Retry-After minimum
@@ -52,12 +66,15 @@ mindmap
       Offline SDK fixtures
       Executable ledger proof
       Javadoc
-    Next production slice
-      Credentialed live verification
-      OpenAI error classification
-      Unified SDK and app retry budget
-      Credential and cost controls
-      Tagged live integration tests
+      ArchUnit dependency gate
+      100 percent line and branch coverage
+      Chinese test intent comments
+      Bilingual operations documents
+    Remaining production integration
+      Approved credentialed live evidence
+      Organization rate and spend limits
+      Application authorization and approval
+      Durable idempotency
     Later hardening
       Rich JSON Schema types
       Durable idempotency
@@ -71,8 +88,8 @@ mindmap
 
 ```mermaid
 flowchart LR
-    A[Current baseline<br/>SDK transport adapter plus offline contract proof] --> B[Opt-in live verification<br/>credentials, errors, retry, and cost]
-    B --> C[Production safety<br/>auth, approval, durable idempotency]
+    A[Current baseline<br/>isolated profiles, global budgets, full deterministic gates] --> B[Deployment-owned live evidence<br/>credentials, rate limits, latency, and cost]
+    B --> C[Application safety<br/>auth, approval, durable idempotency]
     C --> D[Response modes<br/>streaming and structured output]
     D --> E[Operations<br/>tracing, metrics, evaluations]
     E --> F[Scale policies<br/>parallel tools and additional providers]
@@ -104,7 +121,7 @@ Every capability moves through the same lifecycle:
 | OpenAI protocol mapping | SDK fixture tests, unknown-item tests, exact ordering and `call_id` assertions | Responses sequence and protocol ADR. |
 | Tool execution behavior | Preflight-with-zero-side-effect tests and execution-failure tests | Tool ADR and failure path. |
 | Retry or idempotency | Pure policy boundary tests, conflict/failure cases | Reliability diagram and ADR. |
-| Live integration | Explicit opt-in, credential isolation, bounded requests and costs | README scope, system context, verification boundary. |
+| Live integration | Explicit opt-in, credential isolation, bounded requests and costs | Configuration, operations, release verification, and system context. |
 | Parallel or distributed behavior | Race, ordering, partial failure, crash, and recovery tests | New ADR plus deployment/runtime diagrams. |
 
 ## Maintenance checklist

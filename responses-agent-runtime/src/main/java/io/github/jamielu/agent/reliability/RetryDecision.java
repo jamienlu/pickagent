@@ -2,15 +2,15 @@ package io.github.jamielu.agent.reliability;
 
 import java.time.Duration;
 
-/** A closed retry decision: either retry after a delay or stop with a reason. */
+/** 封闭的重试决策：等待后重试或携带原因停止。 */
 public sealed interface RetryDecision permits RetryDecision.RetryAfter, RetryDecision.Stop {
     /**
-     * Retry after at least {@code delay}. This type does not perform the wait.
+     * 至少等待指定时长后重试；该类型本身不执行等待。
      *
-     * @param delay non-negative delay before the next attempt
+     * @param delay 重试前的非负等待时长
      */
     record RetryAfter(Duration delay) implements RetryDecision {
-        /** Validates the retry delay. */
+        /** 校验重试等待时长。 */
         public RetryAfter {
             if (delay == null || delay.isNegative()) {
                 throw new IllegalArgumentException("delay must be non-negative");
@@ -19,12 +19,12 @@ public sealed interface RetryDecision permits RetryDecision.RetryAfter, RetryDec
     }
 
     /**
-     * Stop retrying for the supplied diagnostic reason.
+     * 使用给定诊断原因停止重试。
      *
-     * @param reason non-blank diagnostic reason
+     * @param reason 非空白停止原因
      */
     record Stop(String reason) implements RetryDecision {
-        /** Validates the diagnostic reason. */
+        /** 校验停止原因。 */
         public Stop {
             if (reason == null || reason.isBlank()) {
                 throw new IllegalArgumentException("reason cannot be null or blank");

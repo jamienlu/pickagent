@@ -16,6 +16,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class OpenAiToolBridgeContractTest {
+    // 场景：SDK 调用经注册表往返到 SDK 输出且只执行一次；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void sdkCallRoundTripsThroughRegistryToSdkOutputWithOneExecution() throws Exception {
         ResponseFunctionToolCall inbound = ResponseFunctionToolCall.builder()

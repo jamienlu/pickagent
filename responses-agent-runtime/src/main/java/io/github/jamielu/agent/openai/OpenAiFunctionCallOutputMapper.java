@@ -5,21 +5,17 @@ import io.github.jamielu.agent.api.ToolResult;
 
 import java.util.Objects;
 
-/**
- * Maps a provider-neutral tool result to an OpenAI Responses function-call-output input item.
- *
- */
+/** 把供应商中立工具结果映射为 OpenAI Responses 函数调用输出输入条目。 */
 public final class OpenAiFunctionCallOutputMapper {
-    /** Creates a stateless outbound mapper. */
+    /** 创建无状态出站映射器。 */
     public OpenAiFunctionCallOutputMapper() {
     }
 
     /**
-     * Preserves the original call identifier and output text.
+     * 保留原始调用标识和输出文本。
      *
-     * @param result validated core tool result
-     * @return SDK function-call-output value
-     * @throws NullPointerException when result is null
+     * @param result 供应商中立工具结果
+     * @return SDK 函数调用输出条目
      */
     public ResponseInputItem.FunctionCallOutput map(ToolResult result) {
         Objects.requireNonNull(result, "result");

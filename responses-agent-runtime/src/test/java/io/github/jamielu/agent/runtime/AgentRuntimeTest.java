@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.*;
 
 class AgentRuntimeTest {
+    // 场景：工具调用、观察和最终回答完整保留上下文及原始调用标识；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void toolCallThenResultThenFinalAnswerPreservesContextAndOriginalCallId() {
         List<AgentContext> invocations = new ArrayList<>();
@@ -52,9 +53,17 @@ class AgentRuntimeTest {
         assertEquals(2, completed.stepsTaken());
         assertEquals(new AgentStep(1, exchange.call(), Optional.of(exchange.result())), completed.steps().get(0));
         assertEquals(new AgentStep(2, completed.answer(), Optional.empty()), completed.steps().get(1));
-        assertEquals(completed, runtime.run("Find ORD-001"), "Replay is repeatable across runs");
+        var repeated = assertInstanceOf(
+                AgentRuntime.Completed.class, runtime.run("Find ORD-001"));
+        assertEquals(completed.answer(), repeated.answer(), "Replay is repeatable across runs");
+        assertEquals(completed.trace(), repeated.trace());
+        assertEquals(completed.history(), repeated.history());
+        assertEquals(completed.steps(), repeated.steps());
+        assertEquals(completed.usage().modelCalls(), repeated.usage().modelCalls());
+        assertEquals(completed.usage().toolCalls(), repeated.usage().toolCalls());
     }
 
+    // 场景：模型直接回答时不执行任何工具；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void directFinalAnswerDoesNotExecuteAnyTool() {
         AtomicInteger toolCalls = new AtomicInteger();
@@ -75,6 +84,7 @@ class AgentRuntimeTest {
         assertEquals(new AgentDecision.FinalAnswer("Already known"), result.steps().get(0).decision());
     }
 
+    // 场景：未知工具在执行和下一次模型调用前停止；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void unknownToolStopsBeforeExecutionOrAnotherModelInvocation() {
         AtomicInteger modelCalls = new AtomicInteger();
@@ -97,21 +107,25 @@ class AgentRuntimeTest {
                 stopped.trace());
     }
 
+    // 场景：缺少必填参数时在工具副作用前停止；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void missingArgumentStopsBeforeToolExecution() {
         assertInvalidArguments(Map.of(), "missing=[orderId], extra=[]");
     }
 
+    // 场景：出现多余参数时在工具副作用前停止；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void extraArgumentStopsBeforeToolExecution() {
         assertInvalidArguments(Map.of("orderId", "ORD-001", "admin", "true"), "missing=[], extra=[admin]");
     }
 
+    // 场景：参数为空白时在工具副作用前停止；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void blankArgumentStopsBeforeToolExecution() {
         assertInvalidArguments(Map.of("orderId", " "), "blank argument: orderId");
     }
 
+    // 场景：同一运行重复调用标识时不重复执行工具；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void duplicateCallIdDoesNotExecuteToolTwice() {
         AtomicInteger modelCalls = new AtomicInteger();
@@ -133,6 +147,7 @@ class AgentRuntimeTest {
         assertEquals(1, stopped.history().size());
     }
 
+    // 场景：模型调用预算耗尽时不执行无人消费结果的工具；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void runtimeHonorsMaxStepsAndDoesNotExecuteUnconsumableToolCall() {
         AtomicInteger modelCalls = new AtomicInteger();
@@ -145,8 +160,8 @@ class AgentRuntimeTest {
 
         var stopped = assertInstanceOf(AgentRuntime.Stopped.class, runtime.run("Question"));
 
-        assertEquals(AgentRuntime.StopReason.MAX_STEPS, stopped.reason());
-        assertEquals("maxSteps reached before tool execution: 2", stopped.detail());
+        assertEquals(AgentRuntime.StopReason.MODEL_CALL_LIMIT, stopped.reason());
+        assertEquals("model call limit reached before tool execution: 2", stopped.detail());
         assertEquals(2, stopped.stepsTaken());
         assertEquals(2, stopped.steps().get(1).number());
         assertTrue(stopped.steps().get(1).observation().isEmpty());
@@ -156,6 +171,7 @@ class AgentRuntimeTest {
                 AgentState.MODEL, AgentState.TOOL, AgentState.STOP), stopped.trace());
     }
 
+    // 场景：未知模型编程错误原样暴露而不伪装成预期停止；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void modelProgrammingErrorIsNotDisguisedAsExpectedStop() {
         var bug = new IllegalStateException("model mapping bug");
@@ -166,6 +182,7 @@ class AgentRuntimeTest {
         assertSame(bug, assertThrows(IllegalStateException.class, () -> runtime.run("Question")));
     }
 
+    // 场景：未知工具编程错误原样暴露而不伪装成校验失败；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void toolProgrammingErrorIsNotDisguisedAsValidationFailure() {
         var bug = new IllegalStateException("tool implementation bug");
@@ -176,6 +193,7 @@ class AgentRuntimeTest {
         assertSame(bug, assertThrows(IllegalStateException.class, () -> runtime.run("Question")));
     }
 
+    // 场景：工具交互拒绝调用与结果标识不一致；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void exchangeRejectsMismatchedCallId() {
         var error = assertThrows(IllegalArgumentException.class,
@@ -183,6 +201,7 @@ class AgentRuntimeTest {
         assertEquals("tool result callId must match original callId", error.getMessage());
     }
 
+    // 场景：注册表拒绝同名工具重复注册；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void registryRejectsDuplicateToolRegistration() {
         var registration = new ToolRegistry.Registration(
@@ -192,6 +211,7 @@ class AgentRuntimeTest {
         assertEquals("duplicate tool registration: lookup_order", error.getMessage());
     }
 
+    // 场景：已分类工具异常转换为类型化终态且不自动重试；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void expectedToolExceptionBecomesTypedToolFailureAndStopsWithoutRetry() {
         AtomicInteger modelCalls = new AtomicInteger();
@@ -221,6 +241,7 @@ class AgentRuntimeTest {
                 failed.trace());
     }
 
+    // 场景：后续工具失败保留先前观察且不伪造成功结果；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void toolFailureKeepsEarlierObservationsWithoutInventingSuccessfulOutput() {
         AtomicInteger toolCalls = new AtomicInteger();
@@ -243,6 +264,7 @@ class AgentRuntimeTest {
         assertTrue(failed.steps().get(1).observation().isEmpty());
     }
 
+    // 场景：只有一次模型预算时禁止执行无法续接的工具；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void maxStepsOnePreventsAnyToolExecution() {
         AtomicInteger toolCalls = new AtomicInteger();
@@ -253,12 +275,13 @@ class AgentRuntimeTest {
 
         var stopped = assertInstanceOf(AgentRuntime.Stopped.class, runtime.run("Question"));
 
-        assertEquals(AgentRuntime.StopReason.MAX_STEPS, stopped.reason());
+        assertEquals(AgentRuntime.StopReason.MODEL_CALL_LIMIT, stopped.reason());
         assertEquals(1, stopped.stepsTaken());
         assertEquals(0, toolCalls.get());
         assertTrue(stopped.history().isEmpty());
     }
 
+    // 场景：最后一次允许的模型调用给出答案时仍成功完成；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void finalAnswerOnTheLastAllowedStepIsStillSuccess() {
         var runtime = new AgentRuntime(new ReplayAgentModel(), registry(new ReplayOrderTool()), 2);
@@ -269,15 +292,17 @@ class AgentRuntimeTest {
         assertEquals("Replay answer: Order ORD-001: SHIPPED", completed.answer().text());
     }
 
+    // 场景：构造阶段拒绝非正模型步骤上限；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void nonPositiveMaxStepsIsRejectedAtConstruction() {
         for (int maxSteps : List.of(0, -1)) {
             var error = assertThrows(IllegalArgumentException.class, () -> new AgentRuntime(
                     new ReplayAgentModel(), registry(new ReplayOrderTool()), maxSteps));
-            assertEquals("maxSteps must be positive", error.getMessage());
+            assertEquals("maxModelCalls must be positive", error.getMessage());
         }
     }
 
+    // 场景：步骤拒绝关联到其他调用标识的观察；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void stepRejectsAnObservationWithTheWrongCallId() {
         var error = assertThrows(IllegalArgumentException.class, () -> new AgentStep(1,
@@ -285,6 +310,7 @@ class AgentRuntimeTest {
         assertEquals("observation must match the step's tool callId", error.getMessage());
     }
 
+    // 场景：返回的轨迹、步骤和历史快照不可修改；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void returnedTraceAndStepsAreImmutable() {
         var completed = assertInstanceOf(AgentRuntime.Completed.class,
@@ -295,6 +321,7 @@ class AgentRuntimeTest {
         assertThrows(UnsupportedOperationException.class, () -> completed.history().clear());
     }
 
+    // 场景：模型工厂为每次运行创建独立会话实例；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void modelFactoryCreatesAnIndependentModelForEveryRun() {
         AtomicInteger factoryCalls = new AtomicInteger();
@@ -313,6 +340,7 @@ class AgentRuntimeTest {
         assertEquals(2, factoryCalls.get());
     }
 
+    // 场景：模型工厂返回空值时在运行边界失败；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void nullModelFromFactoryFailsAtRunBoundary() {
         var runtime = AgentRuntime.withModelFactory(

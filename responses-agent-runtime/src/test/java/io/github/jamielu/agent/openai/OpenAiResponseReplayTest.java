@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class OpenAiResponseReplayTest {
+    // 场景：离线回放只执行一次工具并返回最终答案；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void executesTheToolExactlyOnceAndReturnsTheFinalAnswer() throws Exception {
         AtomicInteger executions = new AtomicInteger();
@@ -36,6 +37,7 @@ class OpenAiResponseReplayTest {
         assertEquals("订单 ORD-001 已发货。", result.finalAnswer());
     }
 
+    // 场景：第二轮回放保留原始推理与函数调用对象；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void passesOriginalReasoningAndFunctionCallIntoTheSecondReplayRequest() throws Exception {
         FirstFixture first = firstOutput();
@@ -53,6 +55,7 @@ class OpenAiResponseReplayTest {
         assertTrue(input.get(2).isFunctionCallOutput());
     }
 
+    // 场景：观察全程保留调用标识并在最终轮停止；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void preservesCallIdThroughObservationAndStopsAfterOneFinalReplayTurn() throws Exception {
         FirstFixture first = firstOutput();
@@ -69,6 +72,7 @@ class OpenAiResponseReplayTest {
         assertEquals("final", result.finalAnswer());
     }
 
+    // 场景：首轮协议无效时处理器零执行；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void invalidFirstTurnProtocolCannotExecuteTheHandler() {
         AtomicInteger executions = new AtomicInteger();
@@ -90,6 +94,7 @@ class OpenAiResponseReplayTest {
         assertEquals(0, secondTurns.get());
     }
 
+    // 场景：第二轮出现意外工具条目时失败关闭；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void unexpectedSecondTurnToolItemFailsClosed() {
         AtomicInteger executions = new AtomicInteger();
@@ -108,6 +113,7 @@ class OpenAiResponseReplayTest {
         assertEquals(1, executions.get(), "the valid first turn executes exactly once");
     }
 
+    // 场景：多个调用按序串行执行并在原条目后追加输出；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void executesMultipleCallsSeriallyAndAppendsOutputsAfterOriginalItems() throws Exception {
         AtomicInteger executions = new AtomicInteger();
@@ -134,9 +140,31 @@ class OpenAiResponseReplayTest {
         assertEquals("call_1", input.get(3).asFunctionCallOutput().callId());
         assertEquals("call_2", input.get(4).asFunctionCallOutput().callId());
         assertEquals(List.of("call_1", "call_2"), result.callIds());
+        assertThrows(IllegalStateException.class, result::callId);
         assertEquals(2, executions.get());
     }
 
+    // 场景：第二轮只有推理条目而没有可见文本；行为：提取最终答案；预期：明确拒绝缺失答案。
+    @Test
+    void secondTurnWithoutVisibleTextFailsExplicitly() {
+        assertThrows(IllegalStateException.class,
+                () -> new OpenAiResponseReplay().run(
+                        firstOutput().items(),
+                        ignored -> List.of(ResponseOutputItem.ofReasoning(
+                                ResponseReasoningItem.builder().id("rs-final")
+                                        .summary(List.of()).build())),
+                        registry(new AtomicInteger())));
+    }
+
+    // 场景：回放证据的最终答案为空引用；行为：构造不可变结果；预期：拒绝无效终态。
+    @Test
+    void replayResultRejectsNullFinalAnswer() {
+        assertThrows(NullPointerException.class,
+                () -> new OpenAiResponseReplay.ReplayResult(
+                        List.of(), List.of(), List.of(), null));
+    }
+
+    // 场景：批次第二个工具未知时首个处理器也不执行；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void unknownSecondToolFailsBeforeTheFirstHandlerRuns() {
         AtomicInteger executions = new AtomicInteger();
@@ -157,6 +185,7 @@ class OpenAiResponseReplayTest {
         assertEquals(0, secondTurns.get());
     }
 
+    // 场景：批次第二个调用格式错误时首个处理器也不执行；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void malformedSecondCallFailsBeforeTheFirstHandlerRuns() {
         AtomicInteger executions = new AtomicInteger();
@@ -172,6 +201,7 @@ class OpenAiResponseReplayTest {
         assertEquals(0, executions.get());
     }
 
+    // 场景：批次执行失败后停止剩余调用并跳过第二轮；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void executionFailureStopsTheBatchAndSkipsTheSecondTurn() {
         AtomicInteger executions = new AtomicInteger();

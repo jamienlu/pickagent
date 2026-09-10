@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ResponsesToolContractTest {
     private final OpenAiFunctionToolMapper mapper = new OpenAiFunctionToolMapper();
 
+    // 场景：公开 Schema 属性与注册表参数名称完全一致；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void advertisedSchemaPropertiesExactlyMatchRegistryArgumentNames() {
         ToolRegistry registry = registry(new AtomicInteger());
@@ -34,6 +35,7 @@ class ResponsesToolContractTest {
         assertEquals(registry.definitions().getFirst().requiredArguments(), properties);
     }
 
+    // 场景：公开必填顺序与注册表定义顺序一致；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void advertisedRequiredOrderMatchesRegistryDefinitionOrder() {
         ToolRegistry registry = registry(new AtomicInteger());
@@ -44,6 +46,7 @@ class ResponsesToolContractTest {
                 schema.get("required"));
     }
 
+    // 场景：公开契约为仅含字符串属性的严格封闭对象；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void advertisedContractIsStrictClosedObjectWithOnlyStringProperties() {
         FunctionTool tool = mapper.map(ReplayOrderTool.DEFINITION);
@@ -56,6 +59,7 @@ class ResponsesToolContractTest {
                 assertEquals("string", objectMap(property).get("type")));
     }
 
+    // 场景：合法订单查询完成整轮回放且处理器执行一次；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void validLookupOrderCompletesOneFullReplayRoundAndExecutesHandlerOnce() {
         AtomicInteger handlerExecutions = new AtomicInteger();
@@ -70,6 +74,7 @@ class ResponsesToolContractTest {
                 AgentState.MODEL, AgentState.FINAL, AgentState.STOP), completed.trace());
     }
 
+    // 场景：多余管理参数无效且不会到达处理器；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void extraAdminArgumentIsInvalidAndNeverReachesHandler() {
         assertRejectedBeforeExecution(
@@ -77,6 +82,7 @@ class ResponsesToolContractTest {
                 "invalid arguments for lookup_order: missing=[], extra=[admin]");
     }
 
+    // 场景：缺少必填参数无效且不会到达处理器；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void missingRequiredArgumentIsInvalidAndNeverReachesHandler() {
         assertRejectedBeforeExecution(
@@ -84,6 +90,7 @@ class ResponsesToolContractTest {
                 "invalid arguments for lookup_order: missing=[orderId], extra=[]");
     }
 
+    // 场景：字符串类型参数为空白时仍被注册表拒绝；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void blankStringIsRejectedByRegistryEvenThoughItHasSchemaStringType() {
         assertRejectedBeforeExecution(Map.of("orderId", " "), "blank argument: orderId");

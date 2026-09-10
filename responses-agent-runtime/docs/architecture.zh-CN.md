@@ -9,6 +9,9 @@
 ```mermaid
 flowchart LR
     User[调用方或应用] --> Runtime[AgentRuntime]
+    Online[OpenAiOnlineRunner] --> Runtime
+    Config[OpenAiOnlineConfig] --> Online
+    Client[OpenAiClientFactory] --> Online
     Runtime --> Port[AgentModelPort]
     ModelAdapter[OpenAiResponsesModel] -. 实现 .-> Port
     ModelAdapter --> Transport[OpenAiResponsesTransport]
@@ -33,7 +36,8 @@ flowchart LR
 
 ```mermaid
 flowchart TB
-    example[example<br/>离线组合与 fixture]
+    offline[offline 配置档<br/>确定性 Demo]
+    online[online<br/>配置与组合]
     openai[openai<br/>Responses SDK adapter]
     runtime[runtime<br/>Agent 循环]
     tool[tool<br/>校验与分发]
@@ -43,10 +47,13 @@ flowchart TB
     sdk[OpenAI Java SDK]
     json[fastjson2]
 
-    example --> runtime
-    example --> openai
-    example --> tool
-    example --> api
+    offline --> runtime
+    offline --> tool
+    offline --> api
+    online --> runtime
+    online --> openai
+    online --> tool
+    online --> sdk
     openai --> api
     openai --> tool
     openai --> sdk
@@ -68,9 +75,24 @@ classDiagram
     class AgentRuntime {
       -Supplier~AgentModelPort~ modelFactory
       -ToolRegistry tools
-      -int maxSteps
-      +withModelFactory(modelFactory, tools, maxSteps) AgentRuntime
+      -RunBudget budget
+      -NanoClock clock
+      +withModelFactory(modelFactory, tools, budget, clock) AgentRuntime
       +run(String input) Result
+    }
+    class RunBudget {
+      +int maxModelCalls
+      +int maxToolCalls
+      +Duration maxDuration
+    }
+    class RunUsage {
+      +int modelCalls
+      +int toolCalls
+      +Duration elapsed
+    }
+    class NanoClock {
+      <<interface>>
+      +nanoTime() long
     }
     class AgentModelPort {
       <<interface>>
@@ -114,6 +136,9 @@ classDiagram
 
     AgentRuntime --> AgentModelPort : 请求决策
     AgentRuntime --> ToolRegistry : 校验并执行
+    AgentRuntime --> RunBudget : 强制执行
+    AgentRuntime --> NanoClock : 测量截止时间
+    AgentRuntime ..> RunUsage : 为每个终态生成快照
     AgentRuntime --> AgentStep : 记录步骤
     AgentRuntime --> AgentState : 记录轨迹
     AgentModelPort ..> AgentContext
@@ -141,6 +166,10 @@ classDiagram
 | [`ToolResult`](../src/main/java/io/github/jamielu/agent/api/ToolResult.java) | 使用原始 `callId` 关联的工具输出。 | 存入历史；映射为 `function_call_output`。 |
 | [`AgentModelPort`](../src/main/java/io/github/jamielu/agent/runtime/AgentModelPort.java) | 单次模型决策边界。 | 由 `OpenAiResponsesModel` 和 fixture adapter 实现。 |
 | [`AgentRuntime`](../src/main/java/io/github/jamielu/agent/runtime/AgentRuntime.java) | 驱动有界模型—工具—模型循环，并返回带类型终态结果。 | 每次运行从工厂取得一个 `AgentModelPort`，并使用 `ToolRegistry`。 |
+| [`RunBudget`](../src/main/java/io/github/jamielu/agent/runtime/RunBudget.java) | 模型调用、工具调用和单调时长的不可变跨轮上限。 | 由 `AgentRuntime` 在请求与副作用前强制执行。 |
+| [`RunUsage`](../src/main/java/io/github/jamielu/agent/runtime/RunUsage.java) | 模型调用数、工具调用数和已用时长的不可变快照。 | 每个 Runtime 终态都包含。 |
+| [`NanoClock`](../src/main/java/io/github/jamielu/agent/runtime/NanoClock.java) | 单调时间端口。 | 生产使用系统实现，测试使用确定性 fake。 |
+| [`ModelExecutionException`](../src/main/java/io/github/jamielu/agent/runtime/ModelExecutionException.java) | 供应商中立的类型化模型失败。 | 携带 `FailureKind`，转换为 `AgentRuntime.ModelFailed`。 |
 | [`ToolRegistry`](../src/main/java/io/github/jamielu/agent/tool/ToolRegistry.java) | 白名单、参数精确校验、无副作用批次预检、分发及调用/结果关联。 | 拥有 `Registration` 和 `PreparedCall`；调用 `ToolHandler`。 |
 | [`ToolHandler`](../src/main/java/io/github/jamielu/agent/tool/ToolHandler.java) | 执行已经验证的应用逻辑。 | 注册到 `ToolRegistry`。 |
 | [`ToolExecutionException`](../src/main/java/io/github/jamielu/agent/tool/ToolExecutionException.java) | 带类型的预期 handler 失败。 | 转换为 `AgentRuntime.ToolFailed`。 |
@@ -153,10 +182,23 @@ classDiagram
       +run(firstOutput, secondTurn, registry) ReplayResult
     }
     class OpenAiResponsesModel {
-      -String previousResponseId
-      -String pendingCallId
+      -OpenAiConversation conversation
+      -OpenAiResponseDecoder decoder
       +decide(AgentContext) AgentDecision
     }
+    class OpenAiConversation {
+      -String previousResponseId
+      -String pendingCallId
+      +createRequest(AgentContext) ResponseCreateParams
+      +accept(Response, AgentDecision)
+    }
+    class OpenAiResponseDecoder {
+      +decode(Response) AgentDecision
+    }
+    class OpenAiExceptionMapper {
+      +map(OpenAIException) ModelExecutionException
+    }
+    class OpenAiResponseOptions
     class OpenAiResponsesTransport {
       <<interface>>
       +create(ResponseCreateParams) Response
@@ -190,6 +232,10 @@ classDiagram
 
     AgentModelPort <|.. OpenAiResponsesModel
     OpenAiResponsesModel --> OpenAiResponsesTransport
+    OpenAiResponsesModel --> OpenAiConversation
+    OpenAiResponsesModel --> OpenAiResponseDecoder
+    OpenAiResponsesModel --> OpenAiExceptionMapper
+    OpenAiConversation --> OpenAiResponseOptions
     OpenAiResponsesModel --> OpenAiFunctionToolMapper
     OpenAiResponsesModel --> OpenAiFunctionCallMapper
     OpenAiResponsesModel --> OpenAiFunctionCallOutputMapper
@@ -220,8 +266,22 @@ classDiagram
 | [`OpenAiResponseLedgerException`](../src/main/java/io/github/jamielu/agent/openai/OpenAiResponseLedgerException.java) | 稳定的 fail-closed 协议错误。 | 阻止不安全续接。 |
 | [`OpenAiResponseReplay`](../src/main/java/io/github/jamielu/agent/openai/OpenAiResponseReplay.java) | 编排一个离线工具批次和一个必须为最终回答的续接轮次。 | 组合账本、调用 mapper 和 Registry。 |
 | [`OpenAiResponsesTransport`](../src/main/java/io/github/jamielu/agent/openai/OpenAiResponsesTransport.java) | 最小阻塞式 Responses create 边界，并提供 `OpenAIClient` 桥接。 | 注入实时模型 adapter；离线测试以捕获请求替换。 |
-| [`OpenAiResponsesModel`](../src/main/java/io/github/jamielu/agent/openai/OpenAiResponsesModel.java) | 每次运行独立、使用 `previous_response_id` 的有状态 `AgentModelPort`；重复配置并禁用并行调用。 | 通过 transport 构建 SDK 请求，并将响应映射为核心决策。 |
+| [`OpenAiResponsesModel`](../src/main/java/io/github/jamielu/agent/openai/OpenAiResponsesModel.java) | 协调一次供应商决策，并为每次运行持有独立会话。 | 组合 transport、conversation、decoder 和异常 mapper。 |
+| [`OpenAiConversation`](../src/main/java/io/github/jamielu/agent/openai/OpenAiConversation.java) | 持有续接状态，并构建首轮/续接 SDK 请求。 | 重复应用模型、指令、工具和 response 选项。 |
+| [`OpenAiResponseDecoder`](../src/main/java/io/github/jamielu/agent/openai/OpenAiResponseDecoder.java) | 将异构 SDK 输出解码为一个供应商中立决策。 | 对歧义或不支持的终态输出 fail-closed。 |
+| [`OpenAiResponseOptions`](../src/main/java/io/github/jamielu/agent/openai/OpenAiResponseOptions.java) | 单个 response 输出 Token 与存储选项的不可变值。 | 由 `OpenAiConversation` 应用。 |
+| [`OpenAiExceptionMapper`](../src/main/java/io/github/jamielu/agent/openai/OpenAiExceptionMapper.java) | 将 SDK 失败映射为稳定 `FailureKind`，且不暴露凭据。 | 产生 `ModelExecutionException`。 |
 | [`OpenAiResponsesModelException`](../src/main/java/io/github/jamielu/agent/openai/OpenAiResponsesModelException.java) | 响应 ID、终态输出和续接上下文的稳定失败类型。 | 在不安全续接或接受非法最终回答前抛出。 |
+
+### 在线组合类目录
+
+| 类 | 功能 | 重要关联 |
+| --- | --- | --- |
+| [`OpenAiOnlineConfig`](../src/main/java/io/github/jamielu/agent/online/OpenAiOnlineConfig.java) | 校验环境变量中的秘密、请求设置和全局预算。 | 提供客户端、模型、response 和 Runtime 配置。 |
+| [`OpenAiClientFactory`](../src/main/java/io/github/jamielu/agent/online/OpenAiClientFactory.java) | 创建含超时、base URL 和唯一重试所有权的 SDK 客户端。 | 消费 `OpenAiOnlineConfig`。 |
+| [`OpenAiOnlineRunner`](../src/main/java/io/github/jamielu/agent/online/OpenAiOnlineRunner.java) | 打开、组合、执行并关闭一次在线模型会话。 | 创建 `AgentRuntime` 并保证关闭 SDK 资源。 |
+| `OpenAiAgentCli`（`online` 配置档） | 具有稳定退出行为的显式命令行入口。 | 委托 `OpenAiOnlineRunner`，不属于默认源码集。 |
+| `OpenAiLiveSmokeIT`（`live` 配置档） | 最小带凭据端点兼容性检查。 | 缺少显式密钥和模型时跳过，不属于默认测试套件。 |
 
 ## 可靠性类
 
@@ -277,13 +337,15 @@ sequenceDiagram
     participant H as ToolHandler
 
     Caller->>R: run(input)
-    loop 直到最终回答或 maxSteps
+    loop 直到最终回答、失败或全局预算停止
+        R->>R: 检查截止时间与模型调用预算
         R->>M: decide(AgentContext)
         alt FinalAnswer
             M-->>R: FinalAnswer
             R-->>Caller: Completed
         else ToolCall 且仍有下一模型步骤
             M-->>R: ToolCall
+            R->>R: 检查截止时间、模型数、工具数和重复 ID
             R->>T: execute(call)
             T->>T: prepare(call)
             T->>H: execute(已验证参数)
@@ -362,9 +424,11 @@ sequenceDiagram
 | 变更 | 主要代码 | 必须更新的文档和测试 |
 | --- | --- | --- |
 | 新增 API 值对象或决策类型 | `api` 及 `runtime` 消费方 | 核心类图、类目录、Runtime 测试；抽象改变时新增 ADR。 |
+| 修改全局预算或终态结果 | `runtime` | Runtime 图、ADR-0008 后继、边界测试、运维指标和双语 README。 |
 | 新增供应商 | 新 adapter 包 | 包依赖图、adapter 类图和契约测试；核心包保持供应商中立。 |
 | 新增工具参数类型 | `ToolDefinition`、Registry 校验、供应商 mapper | 工具 ADR、Schema 测试、非法输入测试和中英文 README。 |
 | 演进实时 OpenAI transport | `OpenAiResponsesTransport` 与 `OpenAiResponsesModel` | 有状态时序、ADR-0007、重试/错误分类测试、凭据和成本指引。 |
+| 修改在线配置或配置档所有权 | `online`、`pom.xml`、配置档源码集 | 配置、运维、发布验收和 ADR-0009 后继。 |
 | 新增并行工具执行 | 围绕 `PreparedCall` 的执行策略 | 顺序/失败 ADR、时序图、竞态和部分失败测试。 |
 | 新增持久化幂等 | `IdempotencyStore` 实现 | 部署架构、事务语义 ADR、崩溃和并发测试。 |
 | 新增流式或结构化最终输出 | OpenAI 传输/解码层 | ADR-0005 的后续 ADR 或扩展、终态图、不完整/拒绝测试。 |

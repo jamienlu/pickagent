@@ -5,17 +5,14 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Process-local store for deterministic offline use.
+ * 用于确定性离线场景的进程内幂等存储。
  *
- * <p>Concurrency, persistence and cross-process recovery are intentionally out
- * of scope for this exercise.</p>
- *
- * @param <R> operation result type
+ * @param <R> 操作结果类型
  */
 public final class InMemoryIdempotencyStore<R> implements IdempotencyStore<R> {
     private final Map<String, Entry<R>> entries = new HashMap<>();
 
-    /** Creates an empty process-local store. */
+    /** 创建空的进程内存储。 */
     public InMemoryIdempotencyStore() {
     }
 

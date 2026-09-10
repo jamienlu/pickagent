@@ -3,36 +3,36 @@ package io.github.jamielu.agent.reliability;
 import java.util.Optional;
 
 /**
- * Storage port for successful idempotent operation results.
+ * 成功幂等操作结果的存储端口。
  *
- * @param <R> operation result type
+ * @param <R> 操作结果类型
  */
 public interface IdempotencyStore<R> {
     /**
-     * Finds a previously saved entry.
+     * 查找先前保存的条目。
      *
-     * @param operationKey stable application operation key
-     * @return saved entry, or empty on a cache miss
+     * @param operationKey 稳定业务操作键
+     * @return 已保存条目；不存在时为空
      */
     Optional<Entry<R>> find(String operationKey);
 
     /**
-     * Saves a successful operation result.
+     * 保存一次成功操作结果。
      *
-     * @param operationKey stable application operation key
-     * @param entry request identity and result
+     * @param operationKey 稳定业务操作键
+     * @param entry 请求身份与成功结果
      */
     void save(String operationKey, Entry<R> entry);
 
     /**
-     * The request identity and first successful result associated with a key.
+     * 与业务键关联的请求身份及首次成功结果。
      *
-     * @param requestFingerprint stable request fingerprint
-     * @param result first successful result
-     * @param <R> operation result type
+     * @param <R> 操作结果类型
+     * @param requestFingerprint 请求内容的稳定指纹
+     * @param result 首次成功结果
      */
     record Entry<R>(String requestFingerprint, R result) {
-        /** Validates the request fingerprint. */
+        /** 校验请求指纹。 */
         public Entry {
             if (requestFingerprint == null || requestFingerprint.isBlank()) {
                 throw new IllegalArgumentException("requestFingerprint cannot be null or blank");

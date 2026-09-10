@@ -16,16 +16,12 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/** Observable Java 21 demo of an offline reasoning/tool protocol continuation. */
+/** Java 21 离线推理与工具协议续接的可观察演示。 */
 public final class ResponsesAgentRuntimeDemo {
     private ResponsesAgentRuntimeDemo() {
     }
 
-    /**
-     * Runs the deterministic, network-free demonstration.
-     *
-     * @param args ignored command-line arguments
-     */
+    /** 运行确定性、无网络的演示。 */
     public static void main(String[] args) {
         run(System.out);
     }

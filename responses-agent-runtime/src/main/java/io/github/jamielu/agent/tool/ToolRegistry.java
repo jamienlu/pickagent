@@ -85,11 +85,10 @@ public final class ToolRegistry {
     }
 
     /**
-     * Validates a complete call batch before the first handler can run.
+     * 在首个处理器执行前校验完整调用批次。
      *
-     * @param calls model-proposed calls in response order
-     * @return immutable prepared calls in the same order
-     * @throws RejectedCall when any call is invalid or a call id is duplicated
+     * @param calls 按模型响应顺序排列的工具调用
+     * @return 只能由当前注册表执行的不可变预检结果
      */
     public List<PreparedCall> prepareAll(List<AgentDecision.ToolCall> calls) {
         List<AgentDecision.ToolCall> snapshot = List.copyOf(
@@ -110,11 +109,11 @@ public final class ToolRegistry {
     }
 
     /**
-     * Executes one call that was prepared by this registry.
+     * 执行由当前注册表完成预检的一次调用。
      *
-     * @param prepared validated call owned by this registry
-     * @return result correlated with the original call id
-     * @throws ToolExecutionException when the handler reports an expected failure
+     * @param prepared 当前注册表产生的预检结果
+     * @return 保留原调用标识的工具结果
+     * @throws ToolExecutionException 已批准处理器的预期执行失败
      */
     public ToolResult execute(PreparedCall prepared) throws ToolExecutionException {
         Objects.requireNonNull(prepared, "prepared");
@@ -123,27 +122,24 @@ public final class ToolRegistry {
         }
         AgentDecision.ToolCall call = prepared.call;
         Registration registration = prepared.registration;
-        // The handler cannot rewrite callId. Unknown handler bugs intentionally propagate.
+        // 处理器不能改写 callId；未知的处理器编程错误应继续向上抛出。
         String output = Objects.requireNonNull(
                 registration.handler().execute(call.arguments()), "tool handler returned null");
         return new ToolResult(call.callId(), output);
     }
 
     /**
-     * Validates and executes one call for single-call runtime steps.
+     * 校验并执行运行时单调用步骤。
      *
-     * @param call model-proposed call
-     * @return result correlated with the original call id
-     * @throws ToolExecutionException when the handler reports an expected failure
+     * @param call 供应商中立工具调用
+     * @return 保留原调用标识的工具结果
+     * @throws ToolExecutionException 已批准处理器的预期执行失败
      */
     public ToolResult execute(AgentDecision.ToolCall call) throws ToolExecutionException {
         return execute(prepare(call));
     }
 
-    /**
-     * A side-effect-free validation result that can only be executed by its
-     * originating registry.
-     */
+    /** 只能由来源注册表执行的无副作用预检结果。 */
     public static final class PreparedCall {
         private final ToolRegistry owner;
         private final AgentDecision.ToolCall call;
@@ -159,9 +155,9 @@ public final class ToolRegistry {
         }
 
         /**
-         * Returns the validated call.
+         * 返回已经验证的调用。
          *
-         * @return provider-neutral call snapshot
+         * @return 已验证工具调用
          */
         public AgentDecision.ToolCall call() {
             return call;

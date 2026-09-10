@@ -1,9 +1,6 @@
 package io.github.jamielu.agent.internal;
 
-/**
- * Shared validation helpers for public runtime contracts.
- *
- */
+/** 公共运行契约共用的参数校验辅助类。 */
 public final class Arguments {
     /** 工具类不允许实例化。 */
     private Arguments() {

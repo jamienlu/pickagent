@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ResponsesAgentRuntimeDemoTest {
+    // 场景：离线演示打印可观察的协议通过证据；行为：执行对应代码路径；预期：相关业务断言全部成立。
     @Test
     void printsObservablePassingProtocolProof() {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
