@@ -280,8 +280,8 @@ classDiagram
 | [`OpenAiOnlineConfig`](../src/main/java/io/github/jamielu/agent/online/OpenAiOnlineConfig.java) | 校验环境变量中的秘密、请求设置和全局预算。 | 提供客户端、模型、response 和 Runtime 配置。 |
 | [`OpenAiClientFactory`](../src/main/java/io/github/jamielu/agent/online/OpenAiClientFactory.java) | 创建含超时、base URL 和唯一重试所有权的 SDK 客户端。 | 消费 `OpenAiOnlineConfig`。 |
 | [`OpenAiOnlineRunner`](../src/main/java/io/github/jamielu/agent/online/OpenAiOnlineRunner.java) | 打开、组合、执行并关闭一次在线模型会话。 | 创建 `AgentRuntime` 并保证关闭 SDK 资源。 |
-| `OpenAiAgentCli`（`online` 配置档） | 具有稳定退出行为的显式命令行入口。 | 委托 `OpenAiOnlineRunner`，不属于默认源码集。 |
-| `OpenAiLiveSmokeIT`（`live` 配置档） | 最小带凭据端点兼容性检查。 | 缺少显式密钥和模型时跳过，不属于默认测试套件。 |
+| `OpenAiAgentCli` | 具有稳定退出行为的显式命令行入口。 | 位于 `src/main/java`，委托 `OpenAiOnlineRunner`，只有显式运行时才发送请求。 |
+| `OpenAiLiveSmokeIT`（`live` 配置档） | 最小带凭据端点兼容性检查。 | 位于 `src/test/java`；Surefire 排除 `*IT`，live 配置档启用 Failsafe 执行。 |
 
 ## 可靠性类
 
@@ -428,7 +428,7 @@ sequenceDiagram
 | 新增供应商 | 新 adapter 包 | 包依赖图、adapter 类图和契约测试；核心包保持供应商中立。 |
 | 新增工具参数类型 | `ToolDefinition`、Registry 校验、供应商 mapper | 工具 ADR、Schema 测试、非法输入测试和中英文 README。 |
 | 演进实时 OpenAI transport | `OpenAiResponsesTransport` 与 `OpenAiResponsesModel` | 有状态时序、ADR-0007、重试/错误分类测试、凭据和成本指引。 |
-| 修改在线配置或配置档所有权 | `online`、`pom.xml`、配置档源码集 | 配置、运维、发布验收和 ADR-0009 后继。 |
+| 修改在线配置或配置档执行方式 | `online`、`pom.xml`、Maven 标准源码目录 | 配置、运维、发布验收和 ADR-0010 后继。 |
 | 新增并行工具执行 | 围绕 `PreparedCall` 的执行策略 | 顺序/失败 ADR、时序图、竞态和部分失败测试。 |
 | 新增持久化幂等 | `IdempotencyStore` 实现 | 部署架构、事务语义 ADR、崩溃和并发测试。 |
 | 新增流式或结构化最终输出 | OpenAI 传输/解码层 | ADR-0005 的后续 ADR 或扩展、终态图、不完整/拒绝测试。 |

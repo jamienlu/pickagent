@@ -16,12 +16,12 @@ git diff --check
 
 Acceptance evidence:
 
-- The default, offline, and online gates run 171, 172, and 179 tests respectively, with zero failures, errors, or skips.
-- Each non-live gate reports JaCoCo bundle line and branch covered ratios of `1.00` for the production classes compiled by that profile.
+- The default gate runs 181 tests with zero failures, errors, or skips; offline and online profiles reuse the same standard source and test trees.
+- The default gate reports JaCoCo bundle line and branch covered ratios of `1.00` for all production classes.
 - The default `verify` execution generates Javadoc and fails on any warning.
 - Offline output contains `ledger.proof=PASS`, `model.calls=2`, and `tool.calls=1`.
-- The online source and dedicated test sets verify without making a request; the live source set compiles without making a request.
-- The JAR exists and excludes offline, online-CLI, and live-test classes unless their profile is deliberately packaged.
+- Online CLI behavior verifies without making a request; the live integration test compiles but does not run in the default gate.
+- The JAR contains every production class from `src/main/java`, including the offline and online entry points, and excludes every class under `src/test/java`.
 - Every maintained English Markdown file has a same-basename `.zh-CN.md` companion.
 - Relative Markdown links, fenced code blocks, trailing whitespace, and Mermaid blocks pass repository checks.
 - Java source has no pure-English comments or Javadoc; every test method has the required Chinese scenario comment.

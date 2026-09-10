@@ -16,12 +16,12 @@ git diff --check
 
 验收证据：
 
-- 默认、offline 和 online 门禁分别执行 171、172 和 179 个测试，失败、错误和跳过均为零。
-- 每个非 live 门禁对该配置档编译的生产类都报告 JaCoCo bundle 行覆盖率与分支覆盖率为 `1.00`。
+- 默认门禁执行 181 个测试，失败、错误和跳过均为零；offline 与 online 配置档复用同一套标准生产与测试目录。
+- 默认门禁对全部生产类报告 JaCoCo bundle 行覆盖率与分支覆盖率为 `1.00`。
 - 默认 `verify` 会生成 Javadoc，并在出现任一警告时失败。
 - 离线输出包含 `ledger.proof=PASS`、`model.calls=2` 和 `tool.calls=1`。
-- online 源码集与专属测试集完成验证且未发送请求；live 源码集完成编译且未发送请求。
-- JAR 存在；除非显式按相应配置档打包，否则不包含离线、在线 CLI 和 live 测试类。
+- 在线 CLI 行为完成验证且未发送请求；live 集成测试在默认门禁中只编译、不执行。
+- JAR 包含 `src/main/java` 下的全部生产类（包括离线与在线入口），并排除 `src/test/java` 下的全部测试类。
 - 每份持续维护的英文 Markdown 都有同基础名 `.zh-CN.md` 副本。
 - 相对 Markdown 链接、代码围栏、尾随空白和 Mermaid 图均通过仓库检查。
 - Java 源码中没有纯英文注释或 Javadoc；每个测试方法都有规定的中文场景注释。

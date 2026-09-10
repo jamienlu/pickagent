@@ -9,11 +9,12 @@ This directory is the long-lived knowledge base for Responses Agent Runtime. Eve
 - [Project README](../README.md): capabilities, package boundaries, build, and current scope.
 - [Architecture](architecture.md): system context, package and class relationships, runtime sequences, and change-impact guidance.
 - [Project mind map](project-mind-map.md): current capabilities, constraints, and sustainable iteration roadmap.
-- [Configuration](configuration.md): environment variables, defaults, profile isolation, and retry ownership.
+- [Configuration](configuration.md): environment variables, defaults, standard source layout, execution profiles, and retry ownership.
 - [Operations](operations.md): deployment controls, observability, rollout, rollback, and incident evidence.
 - [Troubleshooting](troubleshooting.md): stable failure categories and corrective actions.
 - [Testing](testing.md): test layers, coverage policy, commands, and contribution rules.
 - [Release verification](release-verification.md): deterministic release checklist and residual-risk sign-off.
+- [Project and OpenAI recall questions](project-recall-qa.md): fifty review questions with concise answers grounded in this project and OpenAI Docs.
 
 ## Architecture decision records
 
@@ -26,6 +27,7 @@ This directory is the long-lived knowledge base for Responses Agent Runtime. Eve
 - [ADR-0007: Stateful Responses continuation](adr/0007-stateful-responses-continuation.md)
 - [ADR-0008: Global run budget](adr/0008-global-run-budget.md)
 - [ADR-0009: Profile isolation and responsibility split](adr/0009-profile-isolation-and-responsibility-split.md)
+- [ADR-0010: Standard Maven source layout](adr/0010-standard-maven-source-layout.md)
 
 ## Documentation maintenance contract
 

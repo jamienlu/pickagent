@@ -280,8 +280,8 @@ classDiagram
 | [`OpenAiOnlineConfig`](../src/main/java/io/github/jamielu/agent/online/OpenAiOnlineConfig.java) | Validates environment-backed secrets, request settings, and global budgets. | Supplies client, model, response, and Runtime configuration. |
 | [`OpenAiClientFactory`](../src/main/java/io/github/jamielu/agent/online/OpenAiClientFactory.java) | Creates the SDK client with timeout, base URL, and the single retry owner. | Consumes `OpenAiOnlineConfig`. |
 | [`OpenAiOnlineRunner`](../src/main/java/io/github/jamielu/agent/online/OpenAiOnlineRunner.java) | Opens, composes, runs, and closes one online model session. | Creates `AgentRuntime` and guarantees SDK resource closure. |
-| `OpenAiAgentCli` (`online` profile) | Explicit command-line entry point with stable exit behavior. | Delegates to `OpenAiOnlineRunner`; not part of the default source set. |
-| `OpenAiLiveSmokeIT` (`live` profile) | Minimal credentialed endpoint compatibility check. | Skips without explicit key and model; never part of the default test suite. |
+| `OpenAiAgentCli` | Explicit command-line entry point with stable exit behavior. | Lives in `src/main/java`, delegates to `OpenAiOnlineRunner`, and sends a request only when explicitly run. |
+| `OpenAiLiveSmokeIT` (`live` profile) | Minimal credentialed endpoint compatibility check. | Lives in `src/test/java`; Surefire excludes `*IT`, and the live profile enables Failsafe execution. |
 
 ## Reliability classes
 
@@ -428,7 +428,7 @@ No handler can run before protocol validation, mapping, and complete batch prefl
 | Add a provider | New adapter package | Package graph, adapter diagram, contract tests; keep core packages provider-neutral. |
 | Add a tool argument type | `ToolDefinition`, registry validation, provider mappers | Tool ADR, schema tests, invalid-input tests, and both READMEs. |
 | Evolve the live OpenAI transport | `OpenAiResponsesTransport` and `OpenAiResponsesModel` | Stateful sequence, ADR-0007, retry/error-classification tests, credential and cost guidance. |
-| Change online configuration or profile ownership | `online`, `pom.xml`, profile source sets | Configuration, operations, release verification, and ADR-0009 successor. |
+| Change online configuration or profile execution | `online`, `pom.xml`, standard Maven source trees | Configuration, operations, release verification, and ADR-0010 successor. |
 | Add parallel tool execution | New execution policy around `PreparedCall` | Ordering/failure ADR, sequence diagram, race and partial-failure tests. |
 | Add durable idempotency | `IdempotencyStore` implementation | Deployment architecture, transaction semantics ADR, crash/concurrency tests. |
 | Add streaming or structured final output | OpenAI transport/decoder layer | ADR-0005 successor or extension, terminal-state diagrams, incomplete/refusal tests. |

@@ -9,11 +9,12 @@
 - [项目 README](../README.zh-CN.md)：能力、包边界、构建方式和当前范围。
 - [项目架构](architecture.zh-CN.md)：系统上下文、包和类关系、运行时链路与变更影响指引。
 - [项目思维导图](project-mind-map.zh-CN.md)：当前能力、约束和可持续迭代路线。
-- [配置说明](configuration.zh-CN.md)：环境变量、默认值、配置档隔离和重试所有权。
+- [配置说明](configuration.zh-CN.md)：环境变量、默认值、标准源码布局、执行配置档和重试所有权。
 - [运维说明](operations.zh-CN.md)：部署控制、可观测性、发布、回滚与事故留证。
 - [故障排查](troubleshooting.zh-CN.md)：稳定失败分类与处理方式。
 - [测试说明](testing.zh-CN.md)：测试分层、覆盖率策略、命令与贡献规则。
 - [发布验收](release-verification.zh-CN.md)：确定性发布清单与剩余风险签署。
+- [项目与 OpenAI 回忆题](project-recall-qa.zh-CN.md)：基于本项目和 OpenAI Docs 的 50 道带答案复习题。
 
 ## 架构决策记录
 
@@ -26,6 +27,7 @@
 - [ADR-0007：有状态 Responses 续接](adr/0007-stateful-responses-continuation.zh-CN.md)
 - [ADR-0008：全局运行预算](adr/0008-global-run-budget.zh-CN.md)
 - [ADR-0009：配置档隔离与职责拆分](adr/0009-profile-isolation-and-responsibility-split.zh-CN.md)
+- [ADR-0010：Maven 标准源码布局](adr/0010-standard-maven-source-layout.zh-CN.md)
 
 ## 文档维护契约
 

@@ -22,16 +22,18 @@ Online configuration is read only from the process environment. The default buil
 
 Invalid or blank required values fail before the first request. `OpenAiOnlineConfig.toString()` masks the key and instructions, but callers must still avoid serializing configuration objects into telemetry.
 
-## Build profiles
+## Source layout and execution profiles
 
-| Selection | Sources added | Network behavior |
+All production code uses `src/main/java`; all tests and test fixtures use `src/test/java`. Profiles never add nonstandard source directories.
+
+| Selection | Execution responsibility | Network behavior |
 | --- | --- | --- |
-| default | `src/main/java`, `src/test/java` | Unit and contract tests only; no credentials or network. |
-| `offline` | `src/offline/java`, `src/offline-test/java` | Deterministic local demo and profile-specific acceptance test; no credentials or network. |
-| `online` | `src/online/java`, `src/online-test/java` | Adds the CLI and its offline terminal/exit tests; a request occurs only when the CLI is explicitly run. |
-| `live` | `src/live-test/java` | Adds opt-in integration tests; they skip unless credentials and a model are provided. |
+| default | Compiles all production and test code; Surefire runs `*Test`. | Deterministic tests only; no credentials or network. |
+| `offline` | Selects `OfflineResponsesDemo` for `exec:java`. | Deterministic local demo; no credentials or network. |
+| `online` | Selects `OpenAiAgentCli` for `exec:java`. | A request occurs only when the CLI is explicitly executed. |
+| `live` | Enables Failsafe execution of `OpenAiLiveSmokeIT`. | The test skips unless credentials and a model are provided. |
 
-Profiles isolate entry points and fixtures from the default production artifact. Do not activate `live` in an ordinary CI job.
+Profiles isolate execution, not source placement. Do not activate `live` in an ordinary CI job.
 
 ## Safe examples
 

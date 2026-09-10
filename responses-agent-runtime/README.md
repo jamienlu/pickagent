@@ -19,9 +19,9 @@ Java 21 implementation of a bounded Agent Runtime with an OpenAI Responses API p
 - In-memory idempotency semantics for deterministic local verification.
 - Typed OpenAI SDK failure mapping and a single SDK-owned transport retry boundary.
 - External online configuration for credentials, model, timeout, retries, output limits, continuation storage, and Runtime budgets.
-- Maven-isolated default, offline, online, and live source sets; no API key, network, or paid request is required for the default build.
-- 171 default tests with enforced 100% line and branch coverage, ArchUnit boundaries, and warning-free Javadoc.
-- Profile-specific coverage gates: 172 offline tests and 179 online tests, both without credentials, network access, or paid requests.
+- Standard Maven source layout: every production class is under `src/main/java`, and every test or test fixture is under `src/test/java`.
+- Execution-isolated offline, online, and live profiles; no API key, network, or paid request is required for the default build.
+- 181 default tests with enforced 100% line and branch coverage, architecture and source-layout boundaries, and warning-free Javadoc.
 
 ## Package boundaries
 
@@ -40,13 +40,17 @@ io.github.jamielu.agent.openai
     typed error mapping, and Responses protocol continuation ledger
 
 io.github.jamielu.agent.online
-    Validated external configuration, SDK client creation, and resource lifecycle
+    Validated external configuration, SDK client creation, resource lifecycle,
+    and the explicit online CLI
+
+io.github.jamielu.agent.offline
+    Deterministic executable proof that never opens a network transport
 
 io.github.jamielu.agent.reliability
     Retry and idempotency policies
 
-src/offline and src/online
-    Profile-isolated offline proof and explicit online CLI entry point
+src/test/java/io/github/jamielu/agent/live
+    Opt-in credentialed smoke test, excluded from ordinary Surefire execution
 ```
 
 The runtime and API packages never import OpenAI SDK types. Dependency direction is from adapters toward the provider-neutral API, not from the runtime toward a provider.
@@ -94,9 +98,9 @@ The offline demo prints `ledger.proof=PASS` with two model calls and one tool ca
 
 - Function arguments are currently restricted to required string fields.
 - Multiple calls are preflighted together and then executed serially; no thread-pool parallelism is implemented.
-- The blocking SDK transport and multi-step Runtime adapter are implemented, but the default build and offline profile never make a live request.
+- The blocking SDK transport and multi-step Runtime adapter are implemented, but the default build and offline demo never make a live request.
 - The live adapter deliberately disables parallel tool calls; `OpenAiResponseReplay` retains offline coverage for deterministic multi-call batches.
-- A credentialed smoke test exists only behind the explicit `live` profile; it is not run during ordinary verification and does not prove production latency, cost, or model behavior.
+- A credentialed smoke test lives in the standard test tree but executes only behind the explicit `live` profile; it is not run during ordinary verification and does not prove production latency, cost, or model behavior.
 - The idempotency store is process-local and does not provide crash recovery or distributed exactly-once semantics.
 - Authorization and human approval must be added by the application before sensitive handlers execute.
 
@@ -110,6 +114,7 @@ The offline demo prints `ledger.proof=PASS` with two model calls and one tool ca
 - [Troubleshooting](docs/troubleshooting.md)
 - [Testing](docs/testing.md)
 - [Release verification](docs/release-verification.md)
+- [Project and OpenAI recall questions with answers](docs/project-recall-qa.md)
 - [ADR-0001: Runtime and package boundaries](docs/adr/0001-runtime-and-package-boundaries.md)
 - [ADR-0002: Responses protocol ledger and call batches](docs/adr/0002-responses-protocol-ledger.md)
 - [ADR-0003: Tool contracts and execution authority](docs/adr/0003-tool-contract-and-authority.md)
@@ -119,6 +124,7 @@ The offline demo prints `ledger.proof=PASS` with two model calls and one tool ca
 - [ADR-0007: Stateful Responses continuation](docs/adr/0007-stateful-responses-continuation.md)
 - [ADR-0008: Global run budget](docs/adr/0008-global-run-budget.md)
 - [ADR-0009: Profile isolation and responsibility split](docs/adr/0009-profile-isolation-and-responsibility-split.md)
+- [ADR-0010: Standard Maven source layout](docs/adr/0010-standard-maven-source-layout.md)
 
 ## Official references
 

@@ -22,16 +22,18 @@
 
 必填值缺失、空白或格式非法时，会在首个请求前失败。`OpenAiOnlineConfig.toString()` 会遮蔽密钥与指令，但调用方仍不应把完整配置对象写入遥测。
 
-## 构建配置档
+## 源码布局与执行配置档
 
-| 选择 | 增加的源码 | 网络行为 |
+所有生产代码使用 `src/main/java`，所有测试与测试 fixture 使用 `src/test/java`。配置档不得再增加非标准源码目录。
+
+| 选择 | 执行职责 | 网络行为 |
 | --- | --- | --- |
-| 默认 | `src/main/java`、`src/test/java` | 只有单元与契约测试；无凭据、无网络。 |
-| `offline` | `src/offline/java`、`src/offline-test/java` | 确定性本地演示和配置档专属验收测试；无凭据、无网络。 |
-| `online` | `src/online/java`、`src/online-test/java` | 增加 CLI 及其离线终态/退出测试；只有显式运行 CLI 才会发起请求。 |
-| `live` | `src/live-test/java` | 增加显式集成测试；未提供凭据与模型时自动跳过。 |
+| 默认 | 编译全部生产与测试代码；Surefire 执行 `*Test`。 | 只执行确定性测试；无凭据、无网络。 |
+| `offline` | 为 `exec:java` 选择 `OfflineResponsesDemo`。 | 确定性本地演示；无凭据、无网络。 |
+| `online` | 为 `exec:java` 选择 `OpenAiAgentCli`。 | 只有显式执行 CLI 才会发起请求。 |
+| `live` | 启用 Failsafe 执行 `OpenAiLiveSmokeIT`。 | 未提供凭据与模型时自动跳过。 |
 
-配置档把入口和 fixture 与默认生产制品隔离。普通 CI 不得启用 `live`。
+配置档隔离执行方式，而不隔离源码位置。普通 CI 不得启用 `live`。
 
 ## 安全示例
 

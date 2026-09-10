@@ -19,9 +19,9 @@
 - 用于确定性本地验证的进程内幂等语义。
 - OpenAI SDK 异常类型化映射，以及由 SDK 独占的 transport 重试边界。
 - 凭据、模型、超时、重试、输出上限、续接存储和 Runtime 预算均使用外置在线配置。
-- Maven 隔离默认、offline、online 和 live 源码集；默认构建无需 API Key、网络或付费请求。
-- 默认 171 个测试，强制 100% 行/分支覆盖率、ArchUnit 边界和零警告 Javadoc。
-- 配置档专属覆盖率门禁：offline 172 个测试、online 179 个测试，均无需凭据、网络访问或付费请求。
+- 使用 Maven 标准源码布局：所有生产类位于 `src/main/java`，所有测试与测试 fixture 位于 `src/test/java`。
+- offline、online 和 live 配置档只隔离执行方式；默认构建无需 API Key、网络或付费请求。
+- 默认 181 个测试，强制 100% 行/分支覆盖率、架构与源码布局边界和零警告 Javadoc。
 
 ## 包边界
 
@@ -40,13 +40,16 @@ io.github.jamielu.agent.openai
     类型化错误映射和 Responses 协议续接账本
 
 io.github.jamielu.agent.online
-    外置配置校验、SDK 客户端创建和资源生命周期
+    外置配置校验、SDK 客户端创建、资源生命周期和显式在线 CLI
+
+io.github.jamielu.agent.offline
+    永不打开网络 transport 的确定性可执行证明
 
 io.github.jamielu.agent.reliability
     重试和幂等策略
 
-src/offline 与 src/online
-    配置档隔离的离线证明和显式在线 CLI 入口
+src/test/java/io/github/jamielu/agent/live
+    默认 Surefire 不执行、仅显式启用的带凭据 smoke 测试
 ```
 
 Runtime 和 API 包不导入 OpenAI SDK 类型。依赖方向从 adapter 指向供应商中立 API，而不是从 Runtime 指向具体供应商。
@@ -91,9 +94,9 @@ mvn "-P!jdk-17,live" -DskipITs test-compile
 
 - 函数参数目前仅支持必填字符串字段。
 - 多个调用会先统一预检，再串行执行；尚未实现线程池并行。
-- 阻塞式 SDK transport 和多步 Runtime adapter 已实现，但默认构建与 offline 配置档绝不会发送 live 请求。
+- 阻塞式 SDK transport 和多步 Runtime adapter 已实现，但默认构建与离线 Demo 绝不会发送 live 请求。
 - 实时 adapter 刻意禁用并行工具调用；`OpenAiResponseReplay` 继续离线覆盖确定性的多调用批次。
-- 带凭据 smoke 测试只存在于显式 `live` 配置档中；普通验收不会运行它，且它不能证明生产延迟、费用或模型行为。
+- 带凭据 smoke 测试位于标准测试目录，但只在显式 `live` 配置档下执行；普通验收不会运行它，且它不能证明生产延迟、费用或模型行为。
 - 幂等存储仅限当前进程，不提供崩溃恢复或分布式 exactly-once 语义。
 - 应用必须在执行敏感 handler 前增加授权和人工审批。
 
@@ -107,6 +110,7 @@ mvn "-P!jdk-17,live" -DskipITs test-compile
 - [故障排查](docs/troubleshooting.zh-CN.md)
 - [测试说明](docs/testing.zh-CN.md)
 - [发布验收](docs/release-verification.zh-CN.md)
+- [项目与 OpenAI 带答案回忆题](docs/project-recall-qa.zh-CN.md)
 - [ADR-0001：Runtime 与包边界](docs/adr/0001-runtime-and-package-boundaries.zh-CN.md)
 - [ADR-0002：Responses 协议账本与调用批次](docs/adr/0002-responses-protocol-ledger.zh-CN.md)
 - [ADR-0003：工具契约与执行权限](docs/adr/0003-tool-contract-and-authority.zh-CN.md)
@@ -116,6 +120,7 @@ mvn "-P!jdk-17,live" -DskipITs test-compile
 - [ADR-0007：有状态 Responses 续接](docs/adr/0007-stateful-responses-continuation.zh-CN.md)
 - [ADR-0008：全局运行预算](docs/adr/0008-global-run-budget.zh-CN.md)
 - [ADR-0009：配置档隔离与职责拆分](docs/adr/0009-profile-isolation-and-responsibility-split.zh-CN.md)
+- [ADR-0010：Maven 标准源码布局](docs/adr/0010-standard-maven-source-layout.zh-CN.md)
 
 ## 官方参考资料
 

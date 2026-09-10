@@ -88,7 +88,7 @@ mindmap
 
 ```mermaid
 flowchart LR
-    A[Current baseline<br/>isolated profiles, global budgets, full deterministic gates] --> B[Deployment-owned live evidence<br/>credentials, rate limits, latency, and cost]
+    A[Current baseline<br/>standard source layout, execution profiles, global budgets] --> B[Deployment-owned live evidence<br/>credentials, rate limits, latency, and cost]
     B --> C[Application safety<br/>auth, approval, durable idempotency]
     C --> D[Response modes<br/>streaming and structured output]
     D --> E[Operations<br/>tracing, metrics, evaluations]
