@@ -1,4 +1,4 @@
-package com.pickagent.assistant.application;
+package io.github.jamielu.assistant.application;
 
 /** Wraps a model invocation failure at the application boundary. */
 public final class AssistantModelException extends RuntimeException {

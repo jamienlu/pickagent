@@ -1,4 +1,4 @@
-package com.pickagent.assistant.application;
+package io.github.jamielu.assistant.application;
 
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;

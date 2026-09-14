@@ -1,4 +1,4 @@
-package com.pickagent.assistant.application;
+package io.github.jamielu.assistant.application;
 
 /** Signals that the caller did not supply usable user content. */
 public final class InvalidAssistantInputException extends RuntimeException {

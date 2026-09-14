@@ -1,6 +1,6 @@
-package com.pickagent.assistant.web;
+package io.github.jamielu.assistant.web;
 
-import com.pickagent.assistant.application.AssistantService;
+import io.github.jamielu.assistant.application.AssistantService;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;

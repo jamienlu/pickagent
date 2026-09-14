@@ -1,4 +1,4 @@
-package com.pickagent.assistant.application;
+package io.github.jamielu.assistant.application;
 
 import reactor.core.publisher.Flux;
 

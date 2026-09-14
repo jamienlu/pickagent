@@ -1,7 +1,7 @@
-package com.pickagent.assistant.web;
+package io.github.jamielu.assistant.web;
 
-import com.pickagent.assistant.application.AssistantModelException;
-import com.pickagent.assistant.application.InvalidAssistantInputException;
+import io.github.jamielu.assistant.application.AssistantModelException;
+import io.github.jamielu.assistant.application.InvalidAssistantInputException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
