@@ -10,7 +10,7 @@ public interface AssistantService {
      * @param userContent exact user content
      * @return complete assistant content
      */
-    String chat(String userContent);
+    AssistantAnswer chat(String userContent);
 
     /**
      * Streams model text fragments without aggregating them.

@@ -20,7 +20,7 @@ public final class DeterministicChatModel implements ChatModel {
     private final AtomicReference<UserMessage> lastUserMessage = new AtomicReference<>();
     private final AtomicInteger calls = new AtomicInteger();
     private final AtomicInteger streams = new AtomicInteger();
-    private volatile String synchronousContent = "fixed answer";
+    private volatile ChatResponse synchronousResponse = response("fixed answer");
     private volatile RuntimeException synchronousFailure;
     private volatile Flux<String> streamingContent = Flux.just("fixed", " ", "stream");
 
@@ -31,7 +31,7 @@ public final class DeterministicChatModel implements ChatModel {
         if (synchronousFailure != null) {
             throw synchronousFailure;
         }
-        return response(synchronousContent);
+        return synchronousResponse;
     }
 
     @Override
@@ -43,7 +43,13 @@ public final class DeterministicChatModel implements ChatModel {
 
     /** Sets the complete response returned by {@link #call(Prompt)}. */
     public void synchronousContent(String content) {
-        this.synchronousContent = Objects.requireNonNull(content, "content");
+        this.synchronousResponse = response(Objects.requireNonNull(content, "content"));
+        this.synchronousFailure = null;
+    }
+
+    /** Sets the complete response, including deterministic metadata and usage. */
+    public void synchronousResponse(ChatResponse response) {
+        this.synchronousResponse = Objects.requireNonNull(response, "response");
         this.synchronousFailure = null;
     }
 

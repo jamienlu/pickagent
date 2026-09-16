@@ -31,7 +31,7 @@ public final class AssistantController {
             consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     public ChatReply chat(@RequestBody ChatRequest request) {
-        return new ChatReply(assistantService.chat(messageOf(request)));
+        return ChatReply.from(assistantService.chat(messageOf(request)));
     }
 
     /** Streams model fragments as server-sent events without aggregation. */

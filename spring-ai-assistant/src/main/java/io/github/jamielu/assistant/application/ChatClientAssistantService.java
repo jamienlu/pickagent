@@ -1,5 +1,6 @@
 package io.github.jamielu.assistant.application;
 
+import io.github.jamielu.assistant.integration.springai.SpringAiChatResponseMapper;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -10,28 +11,30 @@ import java.util.Objects;
 @Service
 public final class ChatClientAssistantService implements AssistantService {
     private final ChatClient chatClient;
+    private final SpringAiChatResponseMapper responseMapper;
 
     /**
      * Uses the application-configured ChatClient.
      *
      * @param chatClient client built at the application configuration boundary
+     * @param responseMapper Spring AI to application response boundary
      */
-    public ChatClientAssistantService(ChatClient chatClient) {
+    public ChatClientAssistantService(
+            ChatClient chatClient,
+            SpringAiChatResponseMapper responseMapper) {
         this.chatClient = Objects.requireNonNull(chatClient, "chatClient");
+        this.responseMapper = Objects.requireNonNull(responseMapper, "responseMapper");
     }
 
     @Override
-    public String chat(String userContent) {
+    public AssistantAnswer chat(String userContent) {
         validate(userContent);
         try {
-            String content = chatClient.prompt()
+            var response = chatClient.prompt()
                     .user(userContent)
                     .call()
-                    .content();
-            if (content == null) {
-                throw new AssistantModelException("assistant model returned null content");
-            }
-            return content;
+                    .chatResponse();
+            return responseMapper.map(response);
         } catch (AssistantModelException failure) {
             throw failure;
         } catch (RuntimeException failure) {

@@ -1,16 +1,25 @@
 package io.github.jamielu.assistant;
 
 import io.github.jamielu.assistant.application.ChatClientAssistantService;
+import io.github.jamielu.assistant.integration.springai.SpringAiChatResponseMapper;
 import io.github.jamielu.assistant.support.DeterministicChatModel;
 import io.github.jamielu.assistant.web.AssistantController;
 import io.github.jamielu.assistant.web.AssistantExceptionHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.metadata.ChatResponseMetadata;
+import org.springframework.ai.chat.metadata.DefaultUsage;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.util.List;
+
+import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -29,7 +38,7 @@ class AssistantHttpTest {
         var chatClient = ChatClient.builder(model)
                 .defaultSystem(SYSTEM_PROMPT)
                 .build();
-        var service = new ChatClientAssistantService(chatClient);
+        var service = new ChatClientAssistantService(chatClient, new SpringAiChatResponseMapper());
         var controller = new AssistantController(service);
         mvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new AssistantExceptionHandler())
@@ -45,10 +54,51 @@ class AssistantHttpTest {
                         .content("{\"message\":\"Explain virtual threads\"}"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.content").value("A deterministic answer"));
+                .andExpect(jsonPath("$.message").value("A deterministic answer"));
 
         assertEquals(SYSTEM_PROMPT, model.lastSystemMessage().getText());
         assertEquals("Explain virtual threads", model.lastUserMessage().getText());
+        assertEquals(1, model.calls());
+    }
+
+    @Test
+    void completeMetadataIsMappedFromTheSameSynchronousResponse() throws Exception {
+        var metadata = ChatResponseMetadata.builder()
+                .id("response-123")
+                .model("offline-model")
+                .usage(new DefaultUsage(12, 7, 19))
+                .build();
+        model.synchronousResponse(new ChatResponse(
+                List.of(new Generation(new AssistantMessage("metadata answer"))),
+                metadata));
+
+        mvc.perform(post("/api/assistant/chat")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\":\"include metadata\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("metadata answer"))
+                .andExpect(jsonPath("$.responseId").value("response-123"))
+                .andExpect(jsonPath("$.model").value("offline-model"))
+                .andExpect(jsonPath("$.usage.promptTokens").value(12))
+                .andExpect(jsonPath("$.usage.completionTokens").value(7))
+                .andExpect(jsonPath("$.usage.totalTokens").value(19));
+
+        assertEquals(1, model.calls());
+    }
+
+    @Test
+    void missingMetadataAndUsageRemainUnknownInsteadOfSyntheticZero() throws Exception {
+        model.synchronousContent("answer without metadata");
+
+        mvc.perform(post("/api/assistant/chat")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\":\"metadata may be absent\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("answer without metadata"))
+                .andExpect(jsonPath("$.responseId").value(nullValue()))
+                .andExpect(jsonPath("$.model").value(nullValue()))
+                .andExpect(jsonPath("$.usage").value(nullValue()));
+
         assertEquals(1, model.calls());
     }
 

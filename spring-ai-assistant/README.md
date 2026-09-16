@@ -6,7 +6,7 @@ Java 21、Spring Boot 4.1.1、Spring AI BOM 2.0.0 的最小同步与 SSE ChatCli
 
 - Spring Boot / Spring AI 自动配置：读取供应商配置，创建 `ChatModel` 和 prototype `ChatClient.Builder`，负责底层对象装配，不决定应用提示词策略。
 - `ChatModel`：模型能力的底层 Spring AI 抽象，接收 `Prompt`，提供同步 `ChatResponse` 或流式 `Flux<ChatResponse>`；生产环境由 OpenAI starter 实现，测试环境由确定性替身实现。
-- `ChatClient`：由应用配置组合根使用 `builder.defaultSystem(...)` 构建，提供 fluent prompt API，调用 `ChatModel`，并把结果投影为 `String` 或 `Flux<String>`。
+- `ChatClient`：由应用配置组合根使用 `builder.defaultSystem(...)` 构建，提供 fluent prompt API；同步链路读取完整 `ChatResponse`，流式链路仍只投影为 `Flux<String>`。
 
 生命周期边界：自动配置的可变 `ChatClient.Builder` 是 prototype，每个注入点获得独立实例，避免一个客户端的默认值污染另一个客户端；本应用在配置类中只构建一个带默认 system prompt 的 `ChatClient` Bean，并由应用服务复用；生产 `ChatModel` 由供应商自动配置管理，测试 `ChatModel` 则由每个测试或测试上下文单独创建。
 
@@ -16,13 +16,23 @@ Java 21、Spring Boot 4.1.1、Spring AI BOM 2.0.0 的最小同步与 SSE ChatCli
 POST /api/assistant/chat
   → AssistantController
   → AssistantService
-  → ChatClient.prompt().user(...).call().content()
+  → ChatClient.prompt().user(...).call().chatResponse()
   → ChatModel
 ```
 
-`call()` 选择同步执行并向模型发送请求，随后可以选择响应投影；`content()` 是其中最窄的投影，只提取模型回复文本。同步链路会等待完整模型响应，因此 Servlet 请求线程可能阻塞。流式链路通过 `stream().content()` 返回惰性的 `Flux<String>`，生产代码不调用 `block()`、`collectList()` 或 `subscribe()`，因此分片、错误和取消信号可以沿 Reactor 链传播。
+`call()` 只选择同步调用模式，真正调用由后续 content()、chatResponse() 等终结操作触发，随后可以选择响应投影；`content()` 是其中最窄的投影，只提取模型回复文本。同步链路会等待完整模型响应，因此 Servlet 请求线程可能阻塞。流式链路通过 `stream().content()` 返回惰性的 `Flux<String>`，生产代码不调用 `block()`、`collectList()` 或 `subscribe()`，因此分片、错误和取消信号可以沿 Reactor 链传播。
 
 “配置一致”不等于“执行模型一致”：同步和流式请求共享同一个 `ChatClient` 默认 system prompt，但前者等待单个完整结果，后者依赖 Reactive 流的订阅、背压、取消和错误信号。
+
+完整同步响应的映射链及依赖边界：
+
+```text
+ChatResponse (Spring AI)
+  → SpringAiChatResponseMapper（允许依赖 Spring AI + 应用值对象）
+  → AssistantAnswer / TokenUsage（只依赖 JDK）
+  → ChatReply / TokenUsageReply（只依赖应用值对象，不依赖 Spring AI）
+  → JSON（不暴露 Java 或供应商原生类型）
+```
 
 ## 配置边界
 
@@ -59,6 +69,34 @@ curl.exe -X POST http://localhost:8080/api/assistant/chat `
   -d '{"message":"Explain virtual threads"}'
 ```
 
+完整元数据响应示例：
+
+```json
+{
+  "message": "Virtual threads are lightweight JVM-managed threads.",
+  "responseId": "response-123",
+  "model": "gpt-example",
+  "usage": {
+    "promptTokens": 12,
+    "completionTokens": 7,
+    "totalTokens": 19
+  }
+}
+```
+
+兼容策略：原有必填 `message` 字段保持不变；`responseId`、`model` 和 `usage` 是新增的可空字段，旧客户端应忽略未知字段。供应商未提供元数据时返回显式 `null`：
+
+```json
+{
+  "message": "Answer without provider metadata.",
+  "responseId": null,
+  "model": null,
+  "usage": null
+}
+```
+
+`null` 表示未知。未知 token 绝不改写为 `0`；数字 `0` 只表示非空供应商 usage 明确报告了零。Spring AI 缺省的 `EmptyUsage` 虽然 getter 返回零，但映射边界会把整个对象识别为未知。
+
 SSE 流式调用：
 
 ```powershell
@@ -68,7 +106,7 @@ curl.exe -N -X POST http://localhost:8080/api/assistant/stream `
   -d '{"message":"Explain virtual threads in three parts"}'
 ```
 
-空白输入映射为 HTTP 400；同步模型失败映射为 HTTP 502。SSE 一旦提交响应头和首个分片，HTTP 状态码已经发送，后续模型错误只能表现为流错误或连接终止，不能再改写成 HTTP 502。
+空白输入映射为 HTTP 400；同步模型失败映射为 HTTP 502。SSE 一旦提交响应头和首个分片，HTTP 状态码已经发送，后续模型错误只能表现为流错误或连接终止，不能再改写成 HTTP 502。当前 SSE 契约只传文本增量，不聚合 `ChatResponse`，因此不返回、也不声称拥有整次请求的最终 usage。
 
 ## 离线测试
 
@@ -81,7 +119,7 @@ Remove-Item Env:OPENAI_BASE_URL -ErrorAction SilentlyContinue
 mvn clean verify
 ```
 
-测试覆盖：Controller → Service → ChatClient 的同步成功路径、准确 system/user message、400/502；SSE 的相同 system/user 策略、三个分片顺序、完成信号、错误信号、惰性订阅和取消传播；外部 system prompt 覆盖、空白配置失败，以及配置文件中不存在密钥。
+测试覆盖：Controller → Service → ChatClient 的同步成功路径、完整元数据映射、缺失元数据保持未知、准确 system/user message、400/502；SSE 的相同 system/user 策略、三个分片顺序、完成信号、错误信号、惰性订阅和取消传播；外部 system prompt 覆盖、空白配置失败，以及配置文件中不存在密钥。
 
 ## 源码树
 
@@ -94,13 +132,18 @@ src/main/java/io/github/jamielu/assistant/
 ├── application/
 │   ├── AssistantService.java
 │   ├── ChatClientAssistantService.java
+│   ├── AssistantAnswer.java
+│   ├── TokenUsage.java
 │   ├── InvalidAssistantInputException.java
 │   └── AssistantModelException.java
+├── integration/springai/
+│   └── SpringAiChatResponseMapper.java
 └── web/
     ├── AssistantController.java
     ├── AssistantExceptionHandler.java
     ├── ChatRequest.java
     ├── ChatReply.java
+    ├── TokenUsageReply.java
     └── ApiError.java
 ```
 
@@ -108,6 +151,9 @@ src/main/java/io/github/jamielu/assistant/
 
 - [Spring AI Getting Started](https://docs.spring.io/spring-ai/reference/getting-started.html)
 - [Spring AI Chat Client API](https://docs.spring.io/spring-ai/reference/api/chatclient.html)
+- [Spring AI ChatResponse Javadoc](https://docs.spring.io/spring-ai/docs/current/api/org/springframework/ai/chat/model/ChatResponse.html)
+- [Spring AI ChatResponseMetadata Javadoc](https://docs.spring.io/spring-ai/docs/current/api/org/springframework/ai/chat/metadata/ChatResponseMetadata.html)
+- [Spring AI Usage Javadoc](https://docs.spring.io/spring-ai/docs/current/api/org/springframework/ai/chat/metadata/Usage.html)
 - [Spring AI 2.0.1 Upgrade Notes](https://docs.spring.io/spring-ai/reference/upgrade-notes.html#_upgrading_to_2_0_1)
 - [Spring AI OpenAI Chat](https://docs.spring.io/spring-ai/reference/api/chat/openai-chat.html)
 - [OpenAI Production best practices](https://developers.openai.com/api/docs/guides/production-best-practices)

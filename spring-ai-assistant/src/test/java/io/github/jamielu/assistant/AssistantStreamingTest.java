@@ -2,6 +2,7 @@ package io.github.jamielu.assistant;
 
 import io.github.jamielu.assistant.application.AssistantModelException;
 import io.github.jamielu.assistant.application.ChatClientAssistantService;
+import io.github.jamielu.assistant.integration.springai.SpringAiChatResponseMapper;
 import io.github.jamielu.assistant.support.DeterministicChatModel;
 import io.github.jamielu.assistant.web.AssistantController;
 import io.github.jamielu.assistant.web.AssistantExceptionHandler;
@@ -33,7 +34,7 @@ class AssistantStreamingTest {
         var chatClient = ChatClient.builder(model)
                 .defaultSystem(SYSTEM_PROMPT)
                 .build();
-        service = new ChatClientAssistantService(chatClient);
+        service = new ChatClientAssistantService(chatClient, new SpringAiChatResponseMapper());
         client = WebTestClient.bindToController(new AssistantController(service))
                 .controllerAdvice(new AssistantExceptionHandler())
                 .build();
