@@ -54,7 +54,8 @@ class AssistantHttpTest {
                         .content("{\"message\":\"Explain virtual threads\"}"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.message").value("A deterministic answer"));
+                .andExpect(jsonPath("$.content").value("A deterministic answer"))
+                .andExpect(jsonPath("$.message").doesNotExist());
 
         assertEquals(SYSTEM_PROMPT, model.lastSystemMessage().getText());
         assertEquals("Explain virtual threads", model.lastUserMessage().getText());
@@ -76,7 +77,8 @@ class AssistantHttpTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"message\":\"include metadata\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").value("metadata answer"))
+                .andExpect(jsonPath("$.content").value("metadata answer"))
+                .andExpect(jsonPath("$.message").doesNotExist())
                 .andExpect(jsonPath("$.responseId").value("response-123"))
                 .andExpect(jsonPath("$.model").value("offline-model"))
                 .andExpect(jsonPath("$.usage.promptTokens").value(12))
@@ -94,7 +96,8 @@ class AssistantHttpTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"message\":\"metadata may be absent\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").value("answer without metadata"))
+                .andExpect(jsonPath("$.content").value("answer without metadata"))
+                .andExpect(jsonPath("$.message").doesNotExist())
                 .andExpect(jsonPath("$.responseId").value(nullValue()))
                 .andExpect(jsonPath("$.model").value(nullValue()))
                 .andExpect(jsonPath("$.usage").value(nullValue()));

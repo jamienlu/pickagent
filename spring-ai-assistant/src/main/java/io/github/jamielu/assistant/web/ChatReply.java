@@ -5,11 +5,11 @@ import io.github.jamielu.assistant.application.AssistantAnswer;
 /**
  * Additive JSON contract for a complete synchronous response.
  *
- * <p>The existing {@code message} field remains required. Nullable added fields
+ * <p>The existing {@code content} field remains required. Nullable added fields
  * explicitly mean unknown and allow older clients to ignore the extension.</p>
  */
 public record ChatReply(
-        String message,
+        String content,
         String responseId,
         String model,
         TokenUsageReply usage) {

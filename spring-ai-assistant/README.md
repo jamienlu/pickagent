@@ -73,7 +73,7 @@ curl.exe -X POST http://localhost:8080/api/assistant/chat `
 
 ```json
 {
-  "message": "Virtual threads are lightweight JVM-managed threads.",
+  "content": "Virtual threads are lightweight JVM-managed threads.",
   "responseId": "response-123",
   "model": "gpt-example",
   "usage": {
@@ -84,11 +84,11 @@ curl.exe -X POST http://localhost:8080/api/assistant/chat `
 }
 ```
 
-兼容策略：原有必填 `message` 字段保持不变；`responseId`、`model` 和 `usage` 是新增的可空字段，旧客户端应忽略未知字段。供应商未提供元数据时返回显式 `null`：
+兼容策略：原有必填 `content` 字段保持不变；`responseId`、`model` 和 `usage` 是新增的可空字段，旧客户端应忽略未知字段。供应商未提供元数据时返回显式 `null`：
 
 ```json
 {
-  "message": "Answer without provider metadata.",
+  "content": "Answer without provider metadata.",
   "responseId": null,
   "model": null,
   "usage": null
