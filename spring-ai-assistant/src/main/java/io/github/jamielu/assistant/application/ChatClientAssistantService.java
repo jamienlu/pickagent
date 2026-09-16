@@ -12,12 +12,12 @@ public final class ChatClientAssistantService implements AssistantService {
     private final ChatClient chatClient;
 
     /**
-     * Builds a client from Spring AI's auto-configured prototype builder.
+     * Uses the application-configured ChatClient.
      *
-     * @param builder auto-configured ChatClient builder
+     * @param chatClient client built at the application configuration boundary
      */
-    public ChatClientAssistantService(ChatClient.Builder builder) {
-        this.chatClient = Objects.requireNonNull(builder, "builder").build();
+    public ChatClientAssistantService(ChatClient chatClient) {
+        this.chatClient = Objects.requireNonNull(chatClient, "chatClient");
     }
 
     @Override

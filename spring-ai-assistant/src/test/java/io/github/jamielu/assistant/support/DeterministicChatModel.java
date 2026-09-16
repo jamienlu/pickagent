@@ -1,6 +1,8 @@
 package io.github.jamielu.assistant.support;
 
 import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.SystemMessage;
+import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
@@ -14,7 +16,8 @@ import java.util.concurrent.atomic.AtomicReference;
 
 /** Deterministic, network-free ChatModel used by every test. */
 public final class DeterministicChatModel implements ChatModel {
-    private final AtomicReference<String> lastUserContent = new AtomicReference<>();
+    private final AtomicReference<SystemMessage> lastSystemMessage = new AtomicReference<>();
+    private final AtomicReference<UserMessage> lastUserMessage = new AtomicReference<>();
     private final AtomicInteger calls = new AtomicInteger();
     private final AtomicInteger streams = new AtomicInteger();
     private volatile String synchronousContent = "fixed answer";
@@ -54,9 +57,14 @@ public final class DeterministicChatModel implements ChatModel {
         this.streamingContent = Objects.requireNonNull(content, "content");
     }
 
-    /** Returns the exact user content most recently received in a prompt. */
-    public String lastUserContent() {
-        return lastUserContent.get();
+    /** Returns the system message most recently received in a prompt. */
+    public SystemMessage lastSystemMessage() {
+        return lastSystemMessage.get();
+    }
+
+    /** Returns the user message most recently received in a prompt. */
+    public UserMessage lastUserMessage() {
+        return lastUserMessage.get();
     }
 
     /** Returns the number of synchronous model invocations. */
@@ -70,7 +78,8 @@ public final class DeterministicChatModel implements ChatModel {
     }
 
     private void capture(Prompt prompt) {
-        lastUserContent.set(prompt.getUserMessage().getText());
+        lastSystemMessage.set(prompt.getSystemMessage());
+        lastUserMessage.set(prompt.getUserMessage());
     }
 
     private static ChatResponse response(String content) {

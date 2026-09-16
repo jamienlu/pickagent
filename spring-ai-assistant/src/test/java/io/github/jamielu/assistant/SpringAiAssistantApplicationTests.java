@@ -34,7 +34,8 @@ class SpringAiAssistantApplicationTests {
         String answer = assistantService.chat("offline context request");
 
         assertEquals("offline context answer", answer);
-        assertEquals("offline context request", chatModel.lastUserContent());
+        assertEquals("You are a concise and accurate assistant.", chatModel.lastSystemMessage().getText());
+        assertEquals("offline context request", chatModel.lastUserMessage().getText());
         assertEquals(1, chatModel.calls());
     }
 }

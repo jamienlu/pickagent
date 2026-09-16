@@ -18,13 +18,18 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class AssistantHttpTest {
+    private static final String SYSTEM_PROMPT = "Answer accurately and concisely.";
+
     private DeterministicChatModel model;
     private MockMvc mvc;
 
     @BeforeEach
     void setUp() {
         model = new DeterministicChatModel();
-        var service = new ChatClientAssistantService(ChatClient.builder(model));
+        var chatClient = ChatClient.builder(model)
+                .defaultSystem(SYSTEM_PROMPT)
+                .build();
+        var service = new ChatClientAssistantService(chatClient);
         var controller = new AssistantController(service);
         mvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new AssistantExceptionHandler())
@@ -32,7 +37,7 @@ class AssistantHttpTest {
     }
 
     @Test
-    void validRequestTraversesControllerServiceAndChatClient() throws Exception {
+    void synchronousPromptContainsConfiguredSystemAndExactUserMessages() throws Exception {
         model.synchronousContent("A deterministic answer");
 
         mvc.perform(post("/api/assistant/chat")
@@ -42,7 +47,8 @@ class AssistantHttpTest {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.content").value("A deterministic answer"));
 
-        assertEquals("Explain virtual threads", model.lastUserContent());
+        assertEquals(SYSTEM_PROMPT, model.lastSystemMessage().getText());
+        assertEquals("Explain virtual threads", model.lastUserMessage().getText());
         assertEquals(1, model.calls());
     }
 

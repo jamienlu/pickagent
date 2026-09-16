@@ -15,11 +15,14 @@ import reactor.core.publisher.Flux;
 import reactor.test.StepVerifier;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AssistantStreamingTest {
+    private static final String SYSTEM_PROMPT = "Answer accurately and concisely.";
+
     private DeterministicChatModel model;
     private ChatClientAssistantService service;
     private WebTestClient client;
@@ -27,14 +30,17 @@ class AssistantStreamingTest {
     @BeforeEach
     void setUp() {
         model = new DeterministicChatModel();
-        service = new ChatClientAssistantService(ChatClient.builder(model));
+        var chatClient = ChatClient.builder(model)
+                .defaultSystem(SYSTEM_PROMPT)
+                .build();
+        service = new ChatClientAssistantService(chatClient);
         client = WebTestClient.bindToController(new AssistantController(service))
                 .controllerAdvice(new AssistantExceptionHandler())
                 .build();
     }
 
     @Test
-    void sseEndpointEmitsThreeOrderedFragmentsAndCompletes() {
+    void streamingPromptContainsSameSystemAndExactUserMessagesInOrder() {
         model.streamingContent(Flux.just("first", "second", "third"));
 
         var response = client.post()
@@ -50,7 +56,8 @@ class AssistantStreamingTest {
         StepVerifier.create(response.getResponseBody())
                 .expectNext("first", "second", "third")
                 .verifyComplete();
-        assertEquals("stream exactly", model.lastUserContent());
+        assertEquals(SYSTEM_PROMPT, model.lastSystemMessage().getText());
+        assertEquals("stream exactly", model.lastUserMessage().getText());
         assertEquals(1, model.streams());
     }
 
@@ -78,5 +85,20 @@ class AssistantStreamingTest {
                 .verify();
 
         assertTrue(cancelled.get());
+    }
+
+    @Test
+    void streamingPipelineDoesNotSubscribeBeforeItsCaller() {
+        AtomicInteger subscriptions = new AtomicInteger();
+        model.streamingContent(Flux.just("lazy")
+                .doOnSubscribe(ignored -> subscriptions.incrementAndGet()));
+
+        Flux<String> result = service.stream("do not subscribe internally");
+
+        assertEquals(0, subscriptions.get());
+        StepVerifier.create(result)
+                .expectNext("lazy")
+                .verifyComplete();
+        assertEquals(1, subscriptions.get());
     }
 }
