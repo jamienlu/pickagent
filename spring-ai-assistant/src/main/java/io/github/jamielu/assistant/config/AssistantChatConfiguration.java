@@ -7,7 +7,7 @@ import org.springframework.context.annotation.Configuration;
 
 /** Composes application prompt policy with Spring AI's auto-configured client builder. */
 @Configuration(proxyBeanMethods = false)
-@EnableConfigurationProperties(AssistantPromptProperties.class)
+@EnableConfigurationProperties({AssistantPromptProperties.class, AssistantStreamProperties.class})
 public class AssistantChatConfiguration {
 
     /**

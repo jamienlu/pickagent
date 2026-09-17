@@ -17,6 +17,8 @@ class ConfigurationBoundaryTest {
         }
 
         assertTrue(configuration.contains("assistant.prompt.system=${ASSISTANT_SYSTEM_PROMPT:"));
+        assertTrue(configuration.contains(
+                "assistant.stream.signal-timeout=${ASSISTANT_STREAM_SIGNAL_TIMEOUT:30s}"));
         assertTrue(configuration.contains("spring.ai.openai.api-key=${OPENAI_API_KEY}"));
         assertTrue(configuration.contains("spring.ai.openai.chat.model=${OPENAI_MODEL}"));
         assertTrue(configuration.contains("spring.ai.openai.base-url=${OPENAI_BASE_URL}"));

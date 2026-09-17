@@ -1,5 +1,6 @@
 package io.github.jamielu.assistant.application;
 
+import io.github.jamielu.assistant.config.AssistantStreamProperties;
 import io.github.jamielu.assistant.integration.springai.SpringAiChatResponseMapper;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
@@ -12,18 +13,22 @@ import java.util.Objects;
 public final class ChatClientAssistantService implements AssistantService {
     private final ChatClient chatClient;
     private final SpringAiChatResponseMapper responseMapper;
+    private final AssistantStreamProperties streamProperties;
 
     /**
      * Uses the application-configured ChatClient.
      *
      * @param chatClient client built at the application configuration boundary
      * @param responseMapper Spring AI to application response boundary
+     * @param streamProperties validated stream timing policy
      */
     public ChatClientAssistantService(
             ChatClient chatClient,
-            SpringAiChatResponseMapper responseMapper) {
+            SpringAiChatResponseMapper responseMapper,
+            AssistantStreamProperties streamProperties) {
         this.chatClient = Objects.requireNonNull(chatClient, "chatClient");
         this.responseMapper = Objects.requireNonNull(responseMapper, "responseMapper");
+        this.streamProperties = Objects.requireNonNull(streamProperties, "streamProperties");
     }
 
     @Override
@@ -45,17 +50,14 @@ public final class ChatClientAssistantService implements AssistantService {
     @Override
     public Flux<String> stream(String userContent) {
         validate(userContent);
-        try {
-            return chatClient.prompt()
+        return Flux.defer(() -> chatClient.prompt()
                     .user(userContent)
                     .stream()
-                    .content()
-                    .onErrorMap(failure -> failure instanceof AssistantModelException
-                            ? failure
-                            : new AssistantModelException(failure));
-        } catch (RuntimeException failure) {
-            return Flux.error(new AssistantModelException(failure));
-        }
+                    .content())
+                .timeout(streamProperties.signalTimeout())
+                .onErrorMap(failure -> failure instanceof AssistantModelException
+                        ? failure
+                        : new AssistantModelException(failure));
     }
 
     private static void validate(String userContent) {

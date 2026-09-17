@@ -1,12 +1,15 @@
 package io.github.jamielu.assistant;
 
 import io.github.jamielu.assistant.application.AssistantService;
+import io.github.jamielu.assistant.config.AssistantStreamProperties;
 import io.github.jamielu.assistant.support.DeterministicChatModel;
 import io.github.jamielu.assistant.support.OfflineChatModelConfiguration;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+
+import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -17,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
         "spring.ai.model.moderation=none",
         "spring.ai.model.audio.speech=none",
         "spring.ai.model.audio.transcription=none",
+        "ASSISTANT_STREAM_SIGNAL_TIMEOUT=750ms",
         "spring.main.web-application-type=none"
 })
 @Import(OfflineChatModelConfiguration.class)
@@ -26,6 +30,9 @@ class SpringAiAssistantApplicationTests {
 
     @Autowired
     private DeterministicChatModel chatModel;
+
+    @Autowired
+    private AssistantStreamProperties streamProperties;
 
     @Test
     void contextAndChatClientWorkWithoutAnOpenAiApiKey() {
@@ -37,5 +44,10 @@ class SpringAiAssistantApplicationTests {
         assertEquals("You are a concise and accurate assistant.", chatModel.lastSystemMessage().getText());
         assertEquals("offline context request", chatModel.lastUserMessage().getText());
         assertEquals(1, chatModel.calls());
+    }
+
+    @Test
+    void externalEnvironmentStylePropertyOverridesDefaultSignalTimeout() {
+        assertEquals(Duration.ofMillis(750), streamProperties.signalTimeout());
     }
 }

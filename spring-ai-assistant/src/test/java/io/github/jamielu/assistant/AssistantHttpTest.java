@@ -1,6 +1,7 @@
 package io.github.jamielu.assistant;
 
 import io.github.jamielu.assistant.application.ChatClientAssistantService;
+import io.github.jamielu.assistant.config.AssistantStreamProperties;
 import io.github.jamielu.assistant.integration.springai.SpringAiChatResponseMapper;
 import io.github.jamielu.assistant.support.DeterministicChatModel;
 import io.github.jamielu.assistant.web.AssistantController;
@@ -18,6 +19,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.util.List;
+import java.time.Duration;
 
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -38,7 +40,10 @@ class AssistantHttpTest {
         var chatClient = ChatClient.builder(model)
                 .defaultSystem(SYSTEM_PROMPT)
                 .build();
-        var service = new ChatClientAssistantService(chatClient, new SpringAiChatResponseMapper());
+        var service = new ChatClientAssistantService(
+                chatClient,
+                new SpringAiChatResponseMapper(),
+                new AssistantStreamProperties(Duration.ofSeconds(30)));
         var controller = new AssistantController(service);
         mvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new AssistantExceptionHandler())

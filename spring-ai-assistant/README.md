@@ -20,7 +20,7 @@ POST /api/assistant/chat
   → ChatModel
 ```
 
-`call()` 只选择同步调用模式，真正调用由后续 content()、chatResponse() 等终结操作触发，随后可以选择响应投影；`content()` 是其中最窄的投影，只提取模型回复文本。同步链路会等待完整模型响应，因此 Servlet 请求线程可能阻塞。流式链路通过 `stream().content()` 返回惰性的 `Flux<String>`，生产代码不调用 `block()`、`collectList()` 或 `subscribe()`，因此分片、错误和取消信号可以沿 Reactor 链传播。
+`call()` 只选择同步调用模式，真正调用由后续 content()、chatResponse() 等终结操作触发，随后可以选择响应投影；`content()` 是其中最窄的投影，只提取模型回复文本。同步链路会等待完整模型响应，因此 Servlet 请求线程可能阻塞。流式链路通过 `Flux.defer` 将 Prompt 构造和 `stream().content()` 推迟到订阅时，生产代码不调用 `block()`、`collectList()` 或 `subscribe()`，因此分片、错误和取消信号可以沿 Reactor 链传播。
 
 “配置一致”不等于“执行模型一致”：同步和流式请求共享同一个 `ChatClient` 默认 system prompt，但前者等待单个完整结果，后者依赖 Reactive 流的订阅、背压、取消和错误信号。
 
@@ -41,16 +41,20 @@ ChatResponse (Spring AI)
 | 环境变量 | 配置归属 | 用途 |
 | --- | --- | --- |
 | `ASSISTANT_SYSTEM_PROMPT` | 应用策略 | 所有同步和流式请求共享的默认系统指令；未提供时使用仓库中的非敏感默认文本 |
+| `ASSISTANT_STREAM_SIGNAL_TIMEOUT` | 应用策略 | 文本流的逐信号超时，默认 `30s`；必须大于零 |
 | `OPENAI_MODEL` | provider | 部署选择的模型名称 |
 | `OPENAI_API_KEY` | provider 凭据 | 从秘密管理系统注入的 API key |
 | `OPENAI_BASE_URL` | transport/provider | OpenAI 或兼容服务的基础地址 |
 
 system prompt 的组合优先级为：外部 `ASSISTANT_SYSTEM_PROMPT` 覆盖配置文件的非敏感默认值 → `AssistantChatConfiguration` 将绑定结果固化为 `ChatClient` 默认 system message → 请求级 `.system(...)` 如被显式使用则覆盖客户端默认值。当前应用服务只设置 `.user(...)`，因此同步和流式调用都继承同一个应用默认 system prompt。
 
+`assistant.stream.signal-timeout` 使用 Spring `Duration` 格式，例如 `750ms`、`5s` 或 `1m`。它是逐文本分片超时，而不是整条响应的总时长：订阅后等待首个 `onNext` 文本分片不能超过该值；每收到一个文本分片后，计时器重新开始，相邻两个 `onNext` 的间隔也不能超过该值。若 `onError` 或 `onComplete` 更早到达，流立即终止，不继续等待超时。超时产生的 `TimeoutException` 与其他模型错误统一包装为 `AssistantModelException`；不自动重试。
+
 PowerShell 在线启动示例：
 
 ```powershell
 $env:ASSISTANT_SYSTEM_PROMPT='Answer accurately and concisely.'
+$env:ASSISTANT_STREAM_SIGNAL_TIMEOUT='30s'
 $env:OPENAI_API_KEY='<secret-from-manager>'
 $env:OPENAI_MODEL='<model-name>'
 $env:OPENAI_BASE_URL='<provider-base-url>'
@@ -106,7 +110,7 @@ curl.exe -N -X POST http://localhost:8080/api/assistant/stream `
   -d '{"message":"Explain virtual threads in three parts"}'
 ```
 
-空白输入映射为 HTTP 400；同步模型失败映射为 HTTP 502。SSE 一旦提交响应头和首个分片，HTTP 状态码已经发送，后续模型错误只能表现为流错误或连接终止，不能再改写成 HTTP 502。当前 SSE 契约只传文本增量，不聚合 `ChatResponse`，因此不返回、也不声称拥有整次请求的最终 usage。
+空白输入映射为 HTTP 400；同步模型失败映射为 HTTP 502。SSE 在响应提交前发生的错误可以由 HTTP 异常处理器处理；一旦响应头或首个分片已经发送，后续超时或模型错误只能表现为流错误/连接终止，不能再改写成 HTTP 502。当前 SSE 契约仍然只传文本增量，不聚合 `ChatResponse`，因此不返回、也不声称拥有整次请求的最终 usage。
 
 ## 离线测试
 
@@ -116,10 +120,12 @@ curl.exe -N -X POST http://localhost:8080/api/assistant/stream `
 Remove-Item Env:OPENAI_API_KEY -ErrorAction SilentlyContinue
 Remove-Item Env:OPENAI_MODEL -ErrorAction SilentlyContinue
 Remove-Item Env:OPENAI_BASE_URL -ErrorAction SilentlyContinue
+Remove-Item Env:ASSISTANT_SYSTEM_PROMPT -ErrorAction SilentlyContinue
+Remove-Item Env:ASSISTANT_STREAM_SIGNAL_TIMEOUT -ErrorAction SilentlyContinue
 mvn clean verify
 ```
 
-测试覆盖：Controller → Service → ChatClient 的同步成功路径、完整元数据映射、缺失元数据保持未知、准确 system/user message、400/502；SSE 的相同 system/user 策略、三个分片顺序、完成信号、错误信号、惰性订阅和取消传播；外部 system prompt 覆盖、空白配置失败，以及配置文件中不存在密钥。
+流式时间测试使用 `StepVerifier.withVirtualTime`，不会真实等待 30 秒。测试覆盖：Controller → Service → ChatClient 的同步成功路径、完整元数据映射、缺失元数据保持未知、准确 system/user message、400/502；SSE 的相同 system/user 策略、订阅前零模型调用、单次订阅一次调用、首分片超时、相邻分片超时、超时原因保留、三个分片顺序、完成信号、错误信号、惰性订阅和取消传播；外部配置覆盖、非法超时启动失败，以及配置文件中不存在密钥。
 
 ## 源码树
 
@@ -128,6 +134,7 @@ src/main/java/io/github/jamielu/assistant/
 ├── SpringAiAssistantApplication.java
 ├── config/
 │   ├── AssistantPromptProperties.java
+│   ├── AssistantStreamProperties.java
 │   └── AssistantChatConfiguration.java
 ├── application/
 │   ├── AssistantService.java
@@ -151,6 +158,10 @@ src/main/java/io/github/jamielu/assistant/
 
 - [Spring AI Getting Started](https://docs.spring.io/spring-ai/reference/getting-started.html)
 - [Spring AI Chat Client API](https://docs.spring.io/spring-ai/reference/api/chatclient.html)
+- [Spring AI Chat Model API](https://docs.spring.io/spring-ai/reference/api/chatmodel.html)
+- [Reactor Flux timeout Javadoc](https://projectreactor.io/docs/core/release/api/reactor/core/publisher/Flux.html#timeout(java.time.Duration))
+- [Reactor virtual-time testing](https://projectreactor.io/docs/core/release/reference/testing.html#_manipulating_time)
+- [Spring Boot Externalized Configuration](https://docs.spring.io/spring-boot/reference/features/external-config.html)
 - [Spring AI ChatResponse Javadoc](https://docs.spring.io/spring-ai/docs/current/api/org/springframework/ai/chat/model/ChatResponse.html)
 - [Spring AI ChatResponseMetadata Javadoc](https://docs.spring.io/spring-ai/docs/current/api/org/springframework/ai/chat/metadata/ChatResponseMetadata.html)
 - [Spring AI Usage Javadoc](https://docs.spring.io/spring-ai/docs/current/api/org/springframework/ai/chat/metadata/Usage.html)

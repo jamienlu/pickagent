@@ -52,6 +52,7 @@ class AssistantPromptConfigurationTest {
     private static ApplicationContextRunner contextRunner(DeterministicChatModel model) {
         return new ApplicationContextRunner()
                 .withUserConfiguration(AssistantChatConfiguration.class)
+                .withPropertyValues("assistant.stream.signal-timeout=30s")
                 .withBean(ChatClient.Builder.class, () -> ChatClient.builder(model));
     }
 }
