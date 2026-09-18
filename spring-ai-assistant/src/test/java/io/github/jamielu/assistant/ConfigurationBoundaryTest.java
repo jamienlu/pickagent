@@ -10,7 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** 验证生产配置只保存环境变量占位符，不包含静态凭据。 */
 class ConfigurationBoundaryTest {
-    /** 验证提示词、超时与 OpenAI 配置均从环境注入，且不存在密钥形态文本。 */
+    /** 验证提示词、流超时、输出上限与 OpenAI 配置均从环境注入，且不存在密钥形态文本。 */
     @Test
     void productionConfigurationContainsOnlyEnvironmentPlaceholders() throws IOException {
         String configuration;
@@ -21,6 +21,8 @@ class ConfigurationBoundaryTest {
         assertTrue(configuration.contains("assistant.prompt.system=${ASSISTANT_SYSTEM_PROMPT:"));
         assertTrue(configuration.contains(
                 "assistant.stream.signal-timeout=${ASSISTANT_STREAM_SIGNAL_TIMEOUT:30s}"));
+        assertTrue(configuration.contains(
+                "assistant.generation.max-output-tokens=${ASSISTANT_MAX_OUTPUT_TOKENS:1024}"));
         assertTrue(configuration.contains("spring.ai.openai.api-key=${OPENAI_API_KEY}"));
         assertTrue(configuration.contains("spring.ai.openai.chat.model=${OPENAI_MODEL}"));
         assertTrue(configuration.contains("spring.ai.openai.base-url=${OPENAI_BASE_URL}"));

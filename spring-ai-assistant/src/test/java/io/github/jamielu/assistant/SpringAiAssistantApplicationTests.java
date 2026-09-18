@@ -1,6 +1,7 @@
 package io.github.jamielu.assistant;
 
 import io.github.jamielu.assistant.application.AssistantService;
+import io.github.jamielu.assistant.config.AssistantGenerationProperties;
 import io.github.jamielu.assistant.config.AssistantStreamProperties;
 import io.github.jamielu.assistant.support.DeterministicChatModel;
 import io.github.jamielu.assistant.support.OfflineChatModelConfiguration;
@@ -22,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
         "spring.ai.model.audio.speech=none",
         "spring.ai.model.audio.transcription=none",
         "ASSISTANT_STREAM_SIGNAL_TIMEOUT=750ms",
+        "ASSISTANT_MAX_OUTPUT_TOKENS=2048",
         "spring.main.web-application-type=none"
 })
 @Import(OfflineChatModelConfiguration.class)
@@ -35,6 +37,9 @@ class SpringAiAssistantApplicationTests {
     @Autowired
     private AssistantStreamProperties streamProperties;
 
+    @Autowired
+    private AssistantGenerationProperties generationProperties;
+
     /** 验证完整上下文使用离线模型完成同步调用，不依赖 OpenAI API Key。 */
     @Test
     void contextAndChatClientWorkWithoutAnOpenAiApiKey() {
@@ -45,6 +50,7 @@ class SpringAiAssistantApplicationTests {
         assertEquals("offline context answer", answer.message());
         assertEquals("You are a concise and accurate assistant.", chatModel.lastSystemMessage().getText());
         assertEquals("offline context request", chatModel.lastUserMessage().getText());
+        assertEquals(2048, chatModel.lastOptions().getMaxTokens());
         assertEquals(1, chatModel.calls());
     }
 
@@ -52,5 +58,11 @@ class SpringAiAssistantApplicationTests {
     @Test
     void externalEnvironmentStylePropertyOverridesDefaultSignalTimeout() {
         assertEquals(Duration.ofMillis(750), streamProperties.signalTimeout());
+    }
+
+    /** 验证环境变量风格属性能够覆盖默认最大输出 Token 数。 */
+    @Test
+    void externalEnvironmentStylePropertyOverridesDefaultMaxOutputTokens() {
+        assertEquals(2048, generationProperties.maxOutputTokens());
     }
 }

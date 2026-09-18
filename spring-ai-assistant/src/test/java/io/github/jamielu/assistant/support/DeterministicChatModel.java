@@ -7,6 +7,7 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.chat.prompt.ChatOptions;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
@@ -18,6 +19,7 @@ import java.util.concurrent.atomic.AtomicReference;
 public final class DeterministicChatModel implements ChatModel {
     private final AtomicReference<SystemMessage> lastSystemMessage = new AtomicReference<>();
     private final AtomicReference<UserMessage> lastUserMessage = new AtomicReference<>();
+    private final AtomicReference<ChatOptions> lastOptions = new AtomicReference<>();
     private final AtomicInteger calls = new AtomicInteger();
     private final AtomicInteger streams = new AtomicInteger();
     private volatile ChatResponse synchronousResponse = response("fixed answer");
@@ -73,6 +75,11 @@ public final class DeterministicChatModel implements ChatModel {
         return lastUserMessage.get();
     }
 
+    /** 返回最近一次提示词实际携带的通用模型选项。 */
+    public ChatOptions lastOptions() {
+        return lastOptions.get();
+    }
+
     /** 返回同步模型调用次数。 */
     public int calls() {
         return calls.get();
@@ -86,6 +93,7 @@ public final class DeterministicChatModel implements ChatModel {
     private void capture(Prompt prompt) {
         lastSystemMessage.set(prompt.getSystemMessage());
         lastUserMessage.set(prompt.getUserMessage());
+        lastOptions.set(prompt.getOptions());
     }
 
     private static ChatResponse response(String content) {

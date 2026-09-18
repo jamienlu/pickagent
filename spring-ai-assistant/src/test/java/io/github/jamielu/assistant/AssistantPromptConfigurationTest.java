@@ -56,6 +56,7 @@ class AssistantPromptConfigurationTest {
         return new ApplicationContextRunner()
                 .withUserConfiguration(AssistantChatConfiguration.class)
                 .withPropertyValues("assistant.stream.signal-timeout=30s")
+                .withPropertyValues("assistant.generation.max-output-tokens=1024")
                 .withBean(ChatClient.Builder.class, () -> ChatClient.builder(model));
     }
 }

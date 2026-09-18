@@ -6,7 +6,7 @@ Java 21、Spring Boot 4.1.1、Spring AI BOM 2.0.0 的最小同步与 SSE ChatCli
 
 - Spring Boot / Spring AI 自动配置：读取供应商配置，创建 `ChatModel` 和 prototype `ChatClient.Builder`，负责底层对象装配，不决定应用提示词策略。
 - `ChatModel`：模型能力的底层 Spring AI 抽象，接收 `Prompt`，提供同步 `ChatResponse` 或流式 `Flux<ChatResponse>`；生产环境由 OpenAI starter 实现，测试环境由确定性替身实现。
-- `ChatClient`：由应用配置组合根使用 `builder.defaultSystem(...)` 构建，提供 fluent prompt API；同步链路读取完整 `ChatResponse`，流式链路仍只投影为 `Flux<String>`。
+- `ChatClient`：由应用配置组合根使用 `builder.defaultSystem(...)` 和 `builder.defaultOptions(...)` 构建，统一承载默认提示词与通用生成策略；同步链路读取完整 `ChatResponse`，流式链路仍只投影为 `Flux<String>`。
 
 生命周期边界：自动配置的可变 `ChatClient.Builder` 是 prototype，每个注入点获得独立实例，避免一个客户端的默认值污染另一个客户端；本应用在配置类中只构建一个带默认 system prompt 的 `ChatClient` Bean，并由应用服务复用；生产 `ChatModel` 由供应商自动配置管理，测试 `ChatModel` 则由每个测试或测试上下文单独创建。
 
@@ -42,11 +42,14 @@ ChatResponse (Spring AI)
 | --- | --- | --- |
 | `ASSISTANT_SYSTEM_PROMPT` | 应用策略 | 所有同步和流式请求共享的默认系统指令；未提供时使用仓库中的非敏感默认文本 |
 | `ASSISTANT_STREAM_SIGNAL_TIMEOUT` | 应用策略 | 文本流的逐信号超时，默认 `30s`；必须大于零 |
+| `ASSISTANT_MAX_OUTPUT_TOKENS` | 应用策略 | 同步和流式请求共享的最大输出 Token 数，默认 `1024`；必须是正整数 |
 | `OPENAI_MODEL` | provider | 部署选择的模型名称 |
 | `OPENAI_API_KEY` | provider 凭据 | 从秘密管理系统注入的 API key |
 | `OPENAI_BASE_URL` | transport/provider | OpenAI 或兼容服务的基础地址 |
 
 system prompt 的组合优先级为：外部 `ASSISTANT_SYSTEM_PROMPT` 覆盖配置文件的非敏感默认值 → `AssistantChatConfiguration` 将绑定结果固化为 `ChatClient` 默认 system message → 请求级 `.system(...)` 如被显式使用则覆盖客户端默认值。当前应用服务只设置 `.user(...)`，因此同步和流式调用都继承同一个应用默认 system prompt。
+
+最大输出 Token 的所有权属于应用生成策略：外部 `ASSISTANT_MAX_OUTPUT_TOKENS` 覆盖默认值 `1024` → `AssistantGenerationProperties` 绑定并校验正数 → 组合根用 `ChatOptions.builder().maxTokens(...)` 写入 `ChatClient.defaultOptions(...)` → 同步与流式 Prompt 继承同一个 `maxTokens`。Controller 和 Service 不绑定、复制或解释这个配置。本工程只治理 Spring AI 通用的 `maxTokens`，不增加 `temperature`，也不引入 Tool、Advisor 或 Memory；具体供应商如何表达或限制该选项仍由对应 `ChatModel` 适配器负责。
 
 `assistant.stream.signal-timeout` 使用 Spring `Duration` 格式，例如 `750ms`、`5s` 或 `1m`。它是逐文本分片超时，而不是整条响应的总时长：订阅后等待首个 `onNext` 文本分片不能超过该值；每收到一个文本分片后，计时器重新开始，相邻两个 `onNext` 的间隔也不能超过该值。若 `onError` 或 `onComplete` 更早到达，流立即终止，不继续等待超时。超时产生的 `TimeoutException` 与其他模型错误统一包装为 `AssistantModelException`；不自动重试。
 
@@ -55,6 +58,7 @@ PowerShell 在线启动示例：
 ```powershell
 $env:ASSISTANT_SYSTEM_PROMPT='Answer accurately and concisely.'
 $env:ASSISTANT_STREAM_SIGNAL_TIMEOUT='30s'
+$env:ASSISTANT_MAX_OUTPUT_TOKENS='1024'
 $env:OPENAI_API_KEY='<secret-from-manager>'
 $env:OPENAI_MODEL='<model-name>'
 $env:OPENAI_BASE_URL='<provider-base-url>'
@@ -122,10 +126,11 @@ Remove-Item Env:OPENAI_MODEL -ErrorAction SilentlyContinue
 Remove-Item Env:OPENAI_BASE_URL -ErrorAction SilentlyContinue
 Remove-Item Env:ASSISTANT_SYSTEM_PROMPT -ErrorAction SilentlyContinue
 Remove-Item Env:ASSISTANT_STREAM_SIGNAL_TIMEOUT -ErrorAction SilentlyContinue
+Remove-Item Env:ASSISTANT_MAX_OUTPUT_TOKENS -ErrorAction SilentlyContinue
 mvn clean verify
 ```
 
-流式时间测试使用 `StepVerifier.withVirtualTime`，不会真实等待 30 秒。测试覆盖：Controller → Service → ChatClient 的同步成功路径、完整元数据映射、缺失元数据保持未知、准确 system/user message、400/502；SSE 的相同 system/user 策略、订阅前零模型调用、单次订阅一次调用、首分片超时、相邻分片超时、超时原因保留、三个分片顺序、完成信号、错误信号、惰性订阅和取消传播；外部配置覆盖、非法超时启动失败，以及配置文件中不存在密钥。
+流式时间测试使用 `StepVerifier.withVirtualTime`，不会真实等待 30 秒。测试覆盖：Controller → Service → ChatClient 的同步成功路径、完整元数据映射、缺失元数据保持未知、准确 system/user message、400/502；SSE 的相同 system/user 策略、订阅前零模型调用、单次订阅一次调用、首分片超时、相邻分片超时、超时原因保留、三个分片顺序、完成信号、错误信号、惰性订阅和取消传播；最大输出 Token 的外部覆盖、正数校验及同步/流式 Prompt 一致性；流超时外部覆盖、非法超时启动失败，以及配置文件中不存在密钥。
 
 ## 源码树
 
@@ -135,6 +140,7 @@ src/main/java/io/github/jamielu/assistant/
 ├── config/
 │   ├── AssistantPromptProperties.java
 │   ├── AssistantStreamProperties.java
+│   ├── AssistantGenerationProperties.java
 │   └── AssistantChatConfiguration.java
 ├── application/
 │   ├── AssistantService.java
