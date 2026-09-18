@@ -3,10 +3,10 @@ package io.github.jamielu.assistant.support;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 
-/** Supplies the deterministic ChatModel for full Spring context tests. */
+/** 为完整 Spring 上下文测试提供确定性的 ChatModel。 */
 @TestConfiguration(proxyBeanMethods = false)
 public class OfflineChatModelConfiguration {
-    /** Returns a network-free model substitute. */
+    /** 返回不访问网络的模型替身。 */
     @Bean
     public DeterministicChatModel deterministicChatModel() {
         return new DeterministicChatModel();

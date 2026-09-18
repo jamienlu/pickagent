@@ -6,7 +6,7 @@
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
         <version>4.1.1</version>
-        <relativePath/> <!-- lookup parent from repository -->
+        <relativePath/> <!-- 从仓库中查找父 POM -->
     </parent>
     <groupId>io.github.jamielu</groupId>
     <artifactId>spring-ai-assistant</artifactId>

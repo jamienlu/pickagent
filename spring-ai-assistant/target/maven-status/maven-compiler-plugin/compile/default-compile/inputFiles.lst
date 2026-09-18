@@ -1,0 +1,17 @@
+D:\project\pickagent\spring-ai-assistant\src\main\java\io\github\jamielu\assistant\application\AssistantAnswer.java
+D:\project\pickagent\spring-ai-assistant\src\main\java\io\github\jamielu\assistant\application\AssistantModelException.java
+D:\project\pickagent\spring-ai-assistant\src\main\java\io\github\jamielu\assistant\application\AssistantService.java
+D:\project\pickagent\spring-ai-assistant\src\main\java\io\github\jamielu\assistant\application\ChatClientAssistantService.java
+D:\project\pickagent\spring-ai-assistant\src\main\java\io\github\jamielu\assistant\application\InvalidAssistantInputException.java
+D:\project\pickagent\spring-ai-assistant\src\main\java\io\github\jamielu\assistant\application\TokenUsage.java
+D:\project\pickagent\spring-ai-assistant\src\main\java\io\github\jamielu\assistant\config\AssistantChatConfiguration.java
+D:\project\pickagent\spring-ai-assistant\src\main\java\io\github\jamielu\assistant\config\AssistantPromptProperties.java
+D:\project\pickagent\spring-ai-assistant\src\main\java\io\github\jamielu\assistant\config\AssistantStreamProperties.java
+D:\project\pickagent\spring-ai-assistant\src\main\java\io\github\jamielu\assistant\integration\springai\SpringAiChatResponseMapper.java
+D:\project\pickagent\spring-ai-assistant\src\main\java\io\github\jamielu\assistant\SpringAiAssistantApplication.java
+D:\project\pickagent\spring-ai-assistant\src\main\java\io\github\jamielu\assistant\web\ApiError.java
+D:\project\pickagent\spring-ai-assistant\src\main\java\io\github\jamielu\assistant\web\AssistantController.java
+D:\project\pickagent\spring-ai-assistant\src\main\java\io\github\jamielu\assistant\web\AssistantExceptionHandler.java
+D:\project\pickagent\spring-ai-assistant\src\main\java\io\github\jamielu\assistant\web\ChatReply.java
+D:\project\pickagent\spring-ai-assistant\src\main\java\io\github\jamielu\assistant\web\ChatRequest.java
+D:\project\pickagent\spring-ai-assistant\src\main\java\io\github\jamielu\assistant\web\TokenUsageReply.java

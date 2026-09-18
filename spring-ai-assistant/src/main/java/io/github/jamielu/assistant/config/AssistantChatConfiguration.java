@@ -5,17 +5,20 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/** Composes application prompt policy with Spring AI's auto-configured client builder. */
+/** 将应用提示词策略与 Spring AI 自动配置的客户端构建器组合起来。 */
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties({AssistantPromptProperties.class, AssistantStreamProperties.class})
 public class AssistantChatConfiguration {
+    /** 创建应用的 ChatClient 配置。 */
+    public AssistantChatConfiguration() {
+    }
 
     /**
-     * Builds the application's single ChatClient with its default system message.
+     * 使用默认系统消息构建应用唯一的 ChatClient。
      *
-     * @param builder Spring AI's prototype-scoped, auto-configured builder
-     * @param promptProperties validated application prompt policy
-     * @return the configured application ChatClient
+     * @param builder Spring AI 自动配置、原型作用域的构建器
+     * @param promptProperties 已校验的应用提示词策略
+     * @return 配置完成的应用 ChatClient
      */
     @Bean
     public ChatClient assistantChatClient(

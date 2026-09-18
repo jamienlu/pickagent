@@ -8,15 +8,18 @@ import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.stereotype.Component;
 
-/** Maps Spring AI response types into provider-neutral application values. */
+/** 将 Spring AI 响应类型映射为与供应商无关的应用值对象。 */
 @Component
 public final class SpringAiChatResponseMapper {
+    /** 创建 Spring AI 响应映射器。 */
+    public SpringAiChatResponseMapper() {
+    }
 
     /**
-     * Maps one complete response without exposing Spring AI metadata downstream.
+     * 映射一条完整响应，不向下游暴露 Spring AI 元数据类型。
      *
-     * @param response complete Spring AI response
-     * @return application-owned answer
+     * @param response 完整的 Spring AI 响应
+     * @return 由应用持有的回答
      */
     public AssistantAnswer map(ChatResponse response) {
         if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {

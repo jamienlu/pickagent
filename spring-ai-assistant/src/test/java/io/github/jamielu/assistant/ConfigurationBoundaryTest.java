@@ -8,7 +8,9 @@ import java.nio.charset.StandardCharsets;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/** 验证生产配置只保存环境变量占位符，不包含静态凭据。 */
 class ConfigurationBoundaryTest {
+    /** 验证提示词、超时与 OpenAI 配置均从环境注入，且不存在密钥形态文本。 */
     @Test
     void productionConfigurationContainsOnlyEnvironmentPlaceholders() throws IOException {
         String configuration;

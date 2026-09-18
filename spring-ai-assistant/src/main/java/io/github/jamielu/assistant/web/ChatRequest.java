@@ -1,5 +1,9 @@
 package io.github.jamielu.assistant.web;
 
-/** Incoming assistant request. */
+/**
+ * 传入的助手请求。
+ *
+ * @param message 用户消息
+ */
 public record ChatRequest(String message) {
 }

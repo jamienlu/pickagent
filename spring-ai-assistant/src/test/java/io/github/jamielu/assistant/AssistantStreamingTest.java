@@ -25,6 +25,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/** 验证 SSE 流的消息、惰性、超时、错误和取消语义。 */
 class AssistantStreamingTest {
     private static final String SYSTEM_PROMPT = "Answer accurately and concisely.";
     private static final Duration SIGNAL_TIMEOUT = Duration.ofSeconds(30);
@@ -48,6 +49,7 @@ class AssistantStreamingTest {
                 .build();
     }
 
+    /** 验证 SSE 按序返回三个分片，并向模型传递统一系统消息和原样用户消息。 */
     @Test
     void streamingPromptContainsSameSystemAndExactUserMessagesInOrder() {
         model.streamingContent(Flux.just("first", "second", "third"));
@@ -70,6 +72,7 @@ class AssistantStreamingTest {
         assertEquals(1, model.streams());
     }
 
+    /** 验证流式模型故障保持为错误信号，并在应用边界保留原始原因。 */
     @Test
     void streamingModelFailureRemainsAnErrorSignal() {
         model.streamingContent(Flux.error(new IllegalStateException("stream failed")));
@@ -82,6 +85,7 @@ class AssistantStreamingTest {
                 .verify();
     }
 
+    /** 验证调用方取消订阅后，取消信号继续传播到底层模型流。 */
     @Test
     void cancellationPropagatesToTheUnderlyingModelFlux() {
         AtomicBoolean cancelled = new AtomicBoolean();
@@ -96,6 +100,7 @@ class AssistantStreamingTest {
         assertTrue(cancelled.get());
     }
 
+    /** 验证仅创建流不会调用或订阅模型，首次订阅才执行一次模型调用。 */
     @Test
     void streamingPipelineDoesNotSubscribeBeforeItsCaller() {
         AtomicInteger subscriptions = new AtomicInteger();
@@ -113,6 +118,7 @@ class AssistantStreamingTest {
         assertEquals(1, model.streams());
     }
 
+    /** 验证首个分片超过逐信号时限时，以虚拟时间产生模型超时错误。 */
     @Test
     void firstFragmentTimeoutIsMappedWithoutWaitingInRealTime() {
         model.streamingContent(Flux.never());
@@ -127,6 +133,7 @@ class AssistantStreamingTest {
         assertEquals(1, model.streams());
     }
 
+    /** 验证每个分片都会重置计时器，相邻分片超时同样映射为模型错误。 */
     @Test
     void timeoutRestartsAfterEachFragment() {
         model.streamingContent(Flux.defer(() -> Flux.concat(

@@ -1,0 +1,9 @@
+io\github\jamielu\assistant\ConfigurationBoundaryTest.class
+io\github\jamielu\assistant\SpringAiAssistantApplicationTests.class
+io\github\jamielu\assistant\support\DeterministicChatModel.class
+io\github\jamielu\assistant\AssistantStreamingTest.class
+io\github\jamielu\assistant\AssistantStreamConfigurationTest$StreamPropertiesConfiguration.class
+io\github\jamielu\assistant\support\OfflineChatModelConfiguration.class
+io\github\jamielu\assistant\AssistantPromptConfigurationTest.class
+io\github\jamielu\assistant\AssistantHttpTest.class
+io\github\jamielu\assistant\AssistantStreamConfigurationTest.class

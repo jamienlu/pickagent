@@ -9,8 +9,10 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/** 验证应用提示词配置的外部覆盖与启动期校验。 */
 class AssistantPromptConfigurationTest {
 
+    /** 验证外部属性覆盖默认系统提示词，并实际进入模型 Prompt。 */
     @Test
     void externalPropertyOverridesTheApplicationSystemPrompt() {
         var model = new DeterministicChatModel();
@@ -35,6 +37,7 @@ class AssistantPromptConfigurationTest {
                 });
     }
 
+    /** 验证空白系统提示词在应用启动阶段产生清晰的配置校验失败。 */
     @Test
     void blankSystemPromptFailsConfigurationValidationClearly() {
         var model = new DeterministicChatModel();

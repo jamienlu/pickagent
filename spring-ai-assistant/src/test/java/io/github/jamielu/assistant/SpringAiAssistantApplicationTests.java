@@ -13,6 +13,7 @@ import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+/** 验证完整 Spring 上下文可在无 OpenAI 密钥和无网络环境下运行。 */
 @SpringBootTest(properties = {
         "spring.ai.model.chat=none",
         "spring.ai.model.embedding=none",
@@ -34,6 +35,7 @@ class SpringAiAssistantApplicationTests {
     @Autowired
     private AssistantStreamProperties streamProperties;
 
+    /** 验证完整上下文使用离线模型完成同步调用，不依赖 OpenAI API Key。 */
     @Test
     void contextAndChatClientWorkWithoutAnOpenAiApiKey() {
         chatModel.synchronousContent("offline context answer");
@@ -46,6 +48,7 @@ class SpringAiAssistantApplicationTests {
         assertEquals(1, chatModel.calls());
     }
 
+    /** 验证环境变量风格属性能够覆盖默认逐信号超时。 */
     @Test
     void externalEnvironmentStylePropertyOverridesDefaultSignalTimeout() {
         assertEquals(Duration.ofMillis(750), streamProperties.signalTimeout());

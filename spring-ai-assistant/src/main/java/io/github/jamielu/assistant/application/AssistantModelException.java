@@ -1,17 +1,21 @@
 package io.github.jamielu.assistant.application;
 
-/** Wraps a model invocation failure at the application boundary. */
+/** 在应用边界封装模型调用失败。 */
 public final class AssistantModelException extends RuntimeException {
     /**
-     * Creates a model failure while retaining the provider exception as cause.
+     * 创建模型失败异常，并保留供应商异常作为原因。
      *
-     * @param cause underlying model failure
+     * @param cause 底层模型失败
      */
     public AssistantModelException(Throwable cause) {
         super("assistant model invocation failed", cause);
     }
 
-    /** Creates a model failure for an invalid model response. */
+    /**
+     * 为无效模型响应创建失败异常。
+     *
+     * @param message 稳定的错误消息
+     */
     public AssistantModelException(String message) {
         super(message);
     }

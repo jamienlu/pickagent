@@ -2,21 +2,21 @@ package io.github.jamielu.assistant.application;
 
 import reactor.core.publisher.Flux;
 
-/** Narrow application boundary for synchronous and streaming assistant text. */
+/** 同步与流式助手文本的窄应用边界。 */
 public interface AssistantService {
     /**
-     * Obtains one complete model answer.
+     * 获取一条完整的模型回答。
      *
-     * @param userContent exact user content
-     * @return complete assistant content
+     * @param userContent 原样传入的用户内容
+     * @return 完整的助手回答
      */
     AssistantAnswer chat(String userContent);
 
     /**
-     * Streams model text fragments without aggregating them.
+     * 按顺序传递模型文本分片，不进行聚合。
      *
-     * @param userContent exact user content
-     * @return ordered content fragments
+     * @param userContent 原样传入的用户内容
+     * @return 有序的文本分片流
      */
     Flux<String> stream(String userContent);
 }

@@ -10,22 +10,27 @@ import reactor.core.publisher.Flux;
 
 import java.util.Objects;
 
-/** HTTP adapter that delegates prompt construction and model calls to the application service. */
+/** 将提示词构造与模型调用委托给应用服务的 HTTP 适配器。 */
 @RestController
 @RequestMapping("/api/assistant")
 public final class AssistantController {
     private final AssistantService assistantService;
 
     /**
-     * Creates the HTTP adapter.
+     * 创建 HTTP 适配器。
      *
-     * @param assistantService narrow application boundary
+     * @param assistantService 窄应用边界
      */
     public AssistantController(AssistantService assistantService) {
         this.assistantService = Objects.requireNonNull(assistantService, "assistantService");
     }
 
-    /** Returns one complete model answer. */
+    /**
+     * 返回一条完整的模型回答。
+     *
+     * @param request 助手请求
+     * @return 同步回答及其可用元数据
+     */
     @PostMapping(
             value = "/chat",
             consumes = MediaType.APPLICATION_JSON_VALUE,
@@ -34,7 +39,12 @@ public final class AssistantController {
         return ChatReply.from(assistantService.chat(messageOf(request)));
     }
 
-    /** Streams model fragments as server-sent events without aggregation. */
+    /**
+     * 以服务器发送事件流式返回模型分片，不进行聚合。
+     *
+     * @param request 助手请求
+     * @return 有序的文本分片流
+     */
     @PostMapping(
             value = "/stream",
             consumes = MediaType.APPLICATION_JSON_VALUE,

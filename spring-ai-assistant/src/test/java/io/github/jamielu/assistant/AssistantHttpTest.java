@@ -28,6 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+/** 验证同步 HTTP 适配器的成功响应、错误映射与公开 JSON 契约。 */
 class AssistantHttpTest {
     private static final String SYSTEM_PROMPT = "Answer accurately and concisely.";
 
@@ -50,6 +51,7 @@ class AssistantHttpTest {
                 .build();
     }
 
+    /** 验证同步请求携带配置的系统消息和原样用户消息，并保持 content 字段兼容。 */
     @Test
     void synchronousPromptContainsConfiguredSystemAndExactUserMessages() throws Exception {
         model.synchronousContent("A deterministic answer");
@@ -67,6 +69,7 @@ class AssistantHttpTest {
         assertEquals(1, model.calls());
     }
 
+    /** 验证内容、响应标识、模型和 Token 用量均映射自同一次完整响应。 */
     @Test
     void completeMetadataIsMappedFromTheSameSynchronousResponse() throws Exception {
         var metadata = ChatResponseMetadata.builder()
@@ -93,6 +96,7 @@ class AssistantHttpTest {
         assertEquals(1, model.calls());
     }
 
+    /** 验证供应商未提供元数据和用量时保持未知，而不是构造数值零。 */
     @Test
     void missingMetadataAndUsageRemainUnknownInsteadOfSyntheticZero() throws Exception {
         model.synchronousContent("answer without metadata");
@@ -110,6 +114,7 @@ class AssistantHttpTest {
         assertEquals(1, model.calls());
     }
 
+    /** 验证空白输入返回 HTTP 400，并且不会调用模型。 */
     @Test
     void blankInputMapsToBadRequestWithoutInvokingTheModel() throws Exception {
         mvc.perform(post("/api/assistant/chat")
@@ -122,6 +127,7 @@ class AssistantHttpTest {
         assertEquals(0, model.calls());
     }
 
+    /** 验证模型调用失败统一映射为 HTTP 502。 */
     @Test
     void modelFailureMapsToBadGateway() throws Exception {
         model.synchronousFailure(new IllegalStateException("offline provider failure"));

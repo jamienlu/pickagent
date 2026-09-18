@@ -8,7 +8,7 @@ import reactor.core.publisher.Flux;
 
 import java.util.Objects;
 
-/** Application service that owns the small ChatClient prompt workflow. */
+/** 负责精简 ChatClient 提示词工作流的应用服务。 */
 @Service
 public final class ChatClientAssistantService implements AssistantService {
     private final ChatClient chatClient;
@@ -16,11 +16,11 @@ public final class ChatClientAssistantService implements AssistantService {
     private final AssistantStreamProperties streamProperties;
 
     /**
-     * Uses the application-configured ChatClient.
+     * 使用由应用配置完成的 ChatClient。
      *
-     * @param chatClient client built at the application configuration boundary
-     * @param responseMapper Spring AI to application response boundary
-     * @param streamProperties validated stream timing policy
+     * @param chatClient 在应用配置边界构建的客户端
+     * @param responseMapper Spring AI 响应到应用响应的映射边界
+     * @param streamProperties 已校验的流式时间策略
      */
     public ChatClientAssistantService(
             ChatClient chatClient,

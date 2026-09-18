@@ -14,10 +14,12 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/** 验证流式逐信号超时配置的绑定与启动期校验。 */
 class AssistantStreamConfigurationTest {
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
             .withUserConfiguration(StreamPropertiesConfiguration.class);
 
+    /** 验证外部属性能够把默认逐信号超时覆盖为毫秒级 Duration。 */
     @Test
     void externalPropertyOverridesTheDefaultSignalTimeout() {
         contextRunner
@@ -29,7 +31,8 @@ class AssistantStreamConfigurationTest {
                 });
     }
 
-    @ParameterizedTest(name = "invalid signal timeout [{0}] fails startup")
+    /** 参数矩阵覆盖空值、零和负数，预期三种非法超时均阻止应用启动。 */
+    @ParameterizedTest(name = "非法逐信号超时 [{0}] 应导致启动失败")
     @ValueSource(strings = {"", "0s", "-1s"})
     void blankZeroAndNegativeTimeoutsFailStartup(String configuredValue) {
         contextRunner

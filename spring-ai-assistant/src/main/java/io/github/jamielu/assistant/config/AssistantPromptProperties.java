@@ -4,7 +4,11 @@ import jakarta.validation.constraints.NotBlank;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
-/** Application-owned prompt policy bound from external configuration. */
+/**
+ * 从外部配置绑定、由应用持有的提示词策略。
+ *
+ * @param system 系统提示词
+ */
 @Validated
 @ConfigurationProperties(prefix = "assistant.prompt")
 public record AssistantPromptProperties(
