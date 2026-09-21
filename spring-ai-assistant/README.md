@@ -6,7 +6,7 @@ Java 21、Spring Boot 4.1.1、Spring AI BOM 2.0.0 的最小同步与 SSE ChatCli
 
 - Spring Boot / Spring AI 自动配置：读取供应商配置，创建 `ChatModel` 和 prototype `ChatClient.Builder`，负责底层对象装配，不决定应用提示词策略。
 - `ChatModel`：模型能力的底层 Spring AI 抽象，接收 `Prompt`，提供同步 `ChatResponse` 或流式 `Flux<ChatResponse>`；生产环境由 OpenAI starter 实现，测试环境由确定性替身实现。
-- `ChatClient`：由应用配置组合根使用 `builder.defaultSystem(...)` 和 `builder.defaultOptions(...)` 构建，统一承载默认提示词与通用生成策略；同步链路读取完整 `ChatResponse`，流式链路仍只投影为 `Flux<String>`。
+- `ChatClient`：由应用配置组合根使用 `builder.defaultSystem(...)`、`builder.defaultOptions(...)` 和 `builder.defaultTools(...)` 构建，统一承载默认提示词、通用生成策略与显式工具白名单；同步链路读取完整 `ChatResponse`，流式链路仍只投影为 `Flux<String>`。
 
 生命周期边界：自动配置的可变 `ChatClient.Builder` 是 prototype，每个注入点获得独立实例，避免一个客户端的默认值污染另一个客户端；本应用在配置类中只构建一个带默认 system prompt 的 `ChatClient` Bean，并由应用服务复用；生产 `ChatModel` 由供应商自动配置管理，测试 `ChatModel` 则由每个测试或测试上下文单独创建。
 
@@ -33,6 +33,32 @@ ChatResponse (Spring AI)
   → ChatReply / TokenUsageReply（只依赖应用值对象，不依赖 Spring AI）
   → JSON（不暴露 Java 或供应商原生类型）
 ```
+
+## 只读工具边界
+
+当前唯一暴露给模型的工具是 `lookup_policy(topic)`，由 `AssistantPolicyTools.lookupPolicy` 使用 `@Tool` 和 `@ToolParam` 声明。配置组合根创建一个明确实例并调用 `defaultTools(policyTools)`；工具类不是组件，不通过组件扫描自动暴露其他方法。
+
+| 工具 | 允许的 topic | 返回语义 |
+| --- | --- | --- |
+| `lookup_policy` | `stream-timeout` | 当前首个文本信号及相邻文本信号的最大等待时间 |
+| `lookup_policy` | `max-output-tokens` | 当前同步与流式 Prompt 共用的 `maxTokens` |
+| `lookup_policy` | `privacy` | 该查询本身仅在进程内只读执行，不访问网络、写文件或访问数据库 |
+
+工具名称和白名单是稳定契约。空白 topic 在读取映射前失败；未知 topic 返回明确的白名单错误；模型请求未注册的工具名称时，Spring AI 工具管理器 fail-closed，不会退化到任意方法执行。工具描述只说明查询能力和输入，不承担鉴权或授权逻辑。
+
+Spring AI 2.0 的调用链为：
+
+```text
+用户
+  → ChatClient / ToolCallingAdvisor
+  → 模型返回 lookup_policy 工具请求
+  → ToolCallingManager 调用 AssistantPolicyTools
+  → 工具结果追加为 ToolResponseMessage
+  → 同一轮消息历史再次发送给模型
+  → 模型最终回答
+```
+
+循环由 Spring AI 2.0 自动注册的 `ToolCallingAdvisor` 管理，应用没有自行实现第二套循环。本工程没有配置 Chat Memory，因此工具请求和结果只服务于当前调用，不声明跨请求记忆；也没有增加自定义 Advisor、写操作、在线查询或其他副作用工具。
 
 ## 配置边界
 
@@ -65,7 +91,7 @@ $env:OPENAI_BASE_URL='<provider-base-url>'
 mvn spring-boot:run
 ```
 
-只有三个变量均已由可信部署环境注入时才应在线启动。不要把真实值写入源码、配置文件、命令历史、日志或提交记录。
+只有 `OPENAI_API_KEY`、`OPENAI_MODEL`、`OPENAI_BASE_URL` 三个 OpenAI 变量均已由可信部署环境注入时才应在线启动。不要把真实值写入源码、配置文件、命令历史、日志或提交记录。
 
 ## HTTP 调用
 
@@ -118,7 +144,7 @@ curl.exe -N -X POST http://localhost:8080/api/assistant/stream `
 
 ## 离线测试
 
-测试禁用 OpenAI ChatModel 自动配置，并注入 `DeterministicChatModel`。替身直接生成固定 `ChatResponse`/`Flux<ChatResponse>`，不读取 API key，不创建外部请求。
+测试禁用 OpenAI ChatModel 自动配置，并注入 `DeterministicChatModel`。替身直接生成固定 `ChatResponse`/`Flux<ChatResponse>`，不读取 API key，不创建外部请求。工具循环测试使用另一个脚本化离线 `ChatModel`：第一轮产生固定工具调用，第二轮严格校验工具结果消息后才返回最终回答。
 
 ```powershell
 Remove-Item Env:OPENAI_API_KEY -ErrorAction SilentlyContinue
@@ -130,7 +156,7 @@ Remove-Item Env:ASSISTANT_MAX_OUTPUT_TOKENS -ErrorAction SilentlyContinue
 mvn clean verify
 ```
 
-流式时间测试使用 `StepVerifier.withVirtualTime`，不会真实等待 30 秒。测试覆盖：Controller → Service → ChatClient 的同步成功路径、完整元数据映射、缺失元数据保持未知、准确 system/user message、400/502；SSE 的相同 system/user 策略、订阅前零模型调用、单次订阅一次调用、首分片超时、相邻分片超时、超时原因保留、三个分片顺序、完成信号、错误信号、惰性订阅和取消传播；最大输出 Token 的外部覆盖、正数校验及同步/流式 Prompt 一致性；流超时外部覆盖、非法超时启动失败，以及配置文件中不存在密钥。
+流式时间测试使用 `StepVerifier.withVirtualTime`，不会真实等待 30 秒。测试覆盖：Controller → Service → ChatClient 的同步成功路径、完整元数据映射、缺失元数据保持未知、准确 system/user message、400/502；SSE 的相同 system/user 策略、订阅前零模型调用、单次订阅一次调用、首分片超时、相邻分片超时、超时原因保留、三个分片顺序、完成信号、错误信号、惰性订阅和取消传播；最大输出 Token 的外部覆盖、正数校验及同步/流式 Prompt 一致性；只读工具白名单、输入失败边界、单次工具执行、两轮 Prompt 历史和未注册工具拒绝；流超时外部覆盖、非法超时启动失败，以及配置文件中不存在密钥。
 
 ## 源码树
 
@@ -151,6 +177,8 @@ src/main/java/io/github/jamielu/assistant/
 │   └── AssistantModelException.java
 ├── integration/springai/
 │   └── SpringAiChatResponseMapper.java
+├── tools/
+│   └── AssistantPolicyTools.java
 └── web/
     ├── AssistantController.java
     ├── AssistantExceptionHandler.java
@@ -173,4 +201,7 @@ src/main/java/io/github/jamielu/assistant/
 - [Spring AI Usage Javadoc](https://docs.spring.io/spring-ai/docs/current/api/org/springframework/ai/chat/metadata/Usage.html)
 - [Spring AI 2.0.1 Upgrade Notes](https://docs.spring.io/spring-ai/reference/upgrade-notes.html#_upgrading_to_2_0_1)
 - [Spring AI OpenAI Chat](https://docs.spring.io/spring-ai/reference/api/chat/openai-chat.html)
+- [Spring AI Tool Calling](https://docs.spring.io/spring-ai/reference/api/tools.html)
+- [Spring AI Advisors](https://docs.spring.io/spring-ai/reference/api/advisors.html)
+- [Spring AI Chat Memory](https://docs.spring.io/spring-ai/reference/api/chat-memory.html)
 - [OpenAI Production best practices](https://developers.openai.com/api/docs/guides/production-best-practices)
